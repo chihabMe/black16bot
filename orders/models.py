@@ -31,4 +31,22 @@ class Order(models.Model):
     def __str__(self) -> str:
         return f"Order #{self.pk} - {self.user}"
 
-# Create your models here.
+
+class OrderItem(models.Model):
+    class Status(models.TextChoices):
+        DELIVERED = "delivered", "Delivered"
+        REFUNDED = "refunded", "Refunded"
+        REPLACED = "replaced", "Replaced"
+
+    order = models.ForeignKey(Order, related_name="items", on_delete=models.CASCADE)
+    stock_item = models.OneToOneField("catalog.StockItem", related_name="order_item", on_delete=models.PROTECT)
+    secret_snapshot = models.TextField()
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.DELIVERED, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    replaced_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["created_at", "pk"]
+
+    def __str__(self) -> str:
+        return f"Order #{self.order_id} item #{self.pk}"

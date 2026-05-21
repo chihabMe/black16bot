@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from urllib.parse import urlparse
 
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -44,6 +45,9 @@ def database_from_url(url: str) -> dict[str, object]:
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-only-change-me")
 
 DEBUG = env_bool("DJANGO_DEBUG", True)
+
+if not DEBUG and SECRET_KEY == "dev-only-change-me":
+    raise ImproperlyConfigured("DJANGO_SECRET_KEY must be set in production.")
 
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
 CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS")
@@ -149,9 +153,9 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", False)
-SESSION_COOKIE_SECURE = env_bool("SESSION_COOKIE_SECURE", False)
-CSRF_COOKIE_SECURE = env_bool("CSRF_COOKIE_SECURE", False)
+SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", not DEBUG)
+SESSION_COOKIE_SECURE = env_bool("SESSION_COOKIE_SECURE", not DEBUG)
+CSRF_COOKIE_SECURE = env_bool("CSRF_COOKIE_SECURE", not DEBUG)
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_ADMIN_IDS = {
@@ -171,6 +175,10 @@ PUBLIC_CHANNEL_URL = os.getenv("PUBLIC_CHANNEL_URL", "")
 ADMIN_NOTIFICATION_CHAT_ID = os.getenv("ADMIN_NOTIFICATION_CHAT_ID", "")
 API_KEY_PEPPER = os.getenv("API_KEY_PEPPER", SECRET_KEY)
 WEBHOOK_SIGNING_SECRET = os.getenv("WEBHOOK_SIGNING_SECRET", SECRET_KEY)
+STOCK_ENCRYPTION_KEY = os.getenv("STOCK_ENCRYPTION_KEY", SECRET_KEY)
+
+if not DEBUG and WEBHOOK_SIGNING_SECRET == SECRET_KEY:
+    raise ImproperlyConfigured("WEBHOOK_SIGNING_SECRET must be separate from DJANGO_SECRET_KEY in production.")
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field

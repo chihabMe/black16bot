@@ -4,6 +4,7 @@ from django.test import TestCase
 
 from catalog.models import Product, StockItem
 from catalog.services import bulk_create_stock
+from security.crypto import decrypt_text
 
 
 class BulkCreateStockTests(TestCase):
@@ -14,8 +15,7 @@ class BulkCreateStockTests(TestCase):
 
         self.assertEqual(count, 2)
         self.assertEqual(StockItem.objects.filter(product=product).count(), 2)
-        self.assertTrue(
-            StockItem.objects.filter(product=product, secret_content="c:d").exists()
-        )
+        secrets = [decrypt_text(item.secret_content) for item in StockItem.objects.filter(product=product)]
+        self.assertIn("c:d", secrets)
 
 # Create your tests here.

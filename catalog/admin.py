@@ -9,6 +9,7 @@ from audit.services import log_admin_action
 from catalog.forms import BulkStockUploadForm
 from catalog.models import Product, StockItem
 from catalog.services import bulk_create_stock
+from security.crypto import decrypt_text
 
 
 class StockItemInline(admin.TabularInline):
@@ -22,7 +23,7 @@ class StockItemInline(admin.TabularInline):
     def secret_preview(self, obj):
         if not obj.pk:
             return ""
-        return f"{obj.secret_content[:24]}..."
+        return f"{decrypt_text(obj.secret_content)[:24]}..."
 
 
 @admin.register(Product)
@@ -112,7 +113,7 @@ class StockItemAdmin(admin.ModelAdmin):
     def secret_preview(self, obj):
         if obj.status == StockItem.Status.SOLD:
             return format_html("<span title='Sold secret hidden'>sold item</span>")
-        return f"{obj.secret_content[:32]}..."
+        return f"{decrypt_text(obj.secret_content)[:32]}..."
 
     def secret_warning(self, obj):
         return "Secret content is delivered to buyers. Be careful when editing sold stock."

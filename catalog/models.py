@@ -42,8 +42,6 @@ class Product(models.Model):
 
     @property
     def available_stock_count(self) -> int:
-        if self.allow_infinite_stock:
-            return 999999
         if hasattr(self, "available_stock"):
             return self.available_stock
         return self.stock_items.filter(status=StockItem.Status.AVAILABLE).count()

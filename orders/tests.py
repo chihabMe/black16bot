@@ -6,6 +6,7 @@ from accounts.models import TelegramUser
 from catalog.models import Product, StockItem
 from orders.models import Order
 from orders.services import InsufficientBalance, OutOfStock, purchase_product, replace_order_stock
+from security.crypto import decrypt_text
 
 
 @override_settings(TELEGRAM_BOT_TOKEN="")
@@ -29,7 +30,8 @@ class PurchaseProductTests(TransactionTestCase):
         self.assertEqual(result.order.status, Order.Status.COMPLETED)
         self.assertEqual(result.order.stock_item, stock)
         self.assertEqual(result.order.quantity, 1)
-        self.assertEqual(result.order.delivered_payload, "login:password")
+        self.assertEqual(decrypt_text(result.order.delivered_payload), "login:password")
+        self.assertEqual(result.order.items.count(), 1)
 
     def test_purchase_can_buy_multiple_stock_items_atomically(self):
         StockItem.objects.create(product=self.product, secret_content="first")
@@ -41,7 +43,8 @@ class PurchaseProductTests(TransactionTestCase):
         self.assertEqual(self.user.balance, Decimal("3.00"))
         self.assertEqual(result.order.quantity, 2)
         self.assertEqual(result.order.price_paid, Decimal("7.00"))
-        self.assertEqual(result.order.delivered_payload, "first\n\nsecond")
+        self.assertEqual(decrypt_text(result.order.delivered_payload), "first\n\nsecond")
+        self.assertEqual(result.order.items.count(), 2)
         self.assertEqual(
             StockItem.objects.filter(product=self.product, status=StockItem.Status.SOLD).count(),
             2,
@@ -81,5 +84,6 @@ class PurchaseProductTests(TransactionTestCase):
         self.assertEqual(result.order.stock_item, replacement)
         self.assertEqual(original.status, StockItem.Status.REPLACED)
         self.assertEqual(replacement.status, StockItem.Status.SOLD)
+        self.assertEqual(decrypt_text(result.order.delivered_payload), "new")
 
 # Create your tests here.
