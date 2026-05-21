@@ -1,0 +1,15 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<div id="content-main">
+  <p>Add one stock item per line for <strong>{{ product.name }}</strong>.</p>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {{ form.as_p }}
+    <div class="submit-row">
+      <input type="submit" value="Upload stock" class="default">
+      <a href="{% url 'admin:catalog_product_change' product.pk %}" class="closelink">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
