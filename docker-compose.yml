@@ -21,9 +21,7 @@ services:
       sh -c "python manage.py migrate --noinput
       && python manage.py collectstatic --noinput
       && gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3"
-    env_file:
-      - path: .env
-        required: false
+    env_file: .env
     environment:
       DATABASE_URL: postgres://black16bot:black16bot@db:5432/black16bot
     ports:
@@ -35,9 +33,7 @@ services:
   bot:
     build: .
     command: python manage.py runbot
-    env_file:
-      - path: .env
-        required: false
+    env_file: .env
     environment:
       DATABASE_URL: postgres://black16bot:black16bot@db:5432/black16bot
     depends_on:
