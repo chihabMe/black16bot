@@ -601,7 +601,8 @@ async def send_or_edit(update, text: str, reply_markup=None):
 
 async def limited(update, action: str, *, limit: int = 12) -> bool:
     user = update.effective_user
-    if user and is_rate_limited(user.id, action, limit=limit):
+    is_limited = await sync_to_async(is_rate_limited)(user.id, action, limit=limit) if user else False
+    if is_limited:
         await send_or_edit(update, "Too many requests. Please wait a minute and try again.")
         return True
     return False

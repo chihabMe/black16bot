@@ -1,16 +1,26 @@
-from time import monotonic
+from datetime import timedelta
 
+from django.db import transaction
+from django.utils import timezone
 
-_BUCKETS: dict[tuple[int, str], list[float]] = {}
+from bot.models import BotRateLimit
 
 
 def is_rate_limited(user_id: int, action: str, *, limit: int = 12, window_seconds: int = 60) -> bool:
-    now = monotonic()
-    key = (user_id, action)
-    recent = [stamp for stamp in _BUCKETS.get(key, []) if now - stamp < window_seconds]
-    if len(recent) >= limit:
-        _BUCKETS[key] = recent
-        return True
-    recent.append(now)
-    _BUCKETS[key] = recent
-    return False
+    now = timezone.now()
+    with transaction.atomic():
+        bucket, _ = BotRateLimit.objects.select_for_update().get_or_create(
+            user_id=user_id,
+            action=action,
+            defaults={"window_start": now, "count": 0},
+        )
+        if now - bucket.window_start >= timedelta(seconds=window_seconds):
+            bucket.window_start = now
+            bucket.count = 1
+            bucket.save(update_fields=["window_start", "count", "updated_at"])
+            return False
+        if bucket.count >= limit:
+            return True
+        bucket.count += 1
+        bucket.save(update_fields=["count", "updated_at"])
+        return False

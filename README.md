@@ -204,6 +204,12 @@ When a referred user receives an approved top-up, a referral ledger entry is
 created using `REFERRAL_COMMISSION_RATE` from `.env`. The default is `0.05`
 for 5%.
 
+Admins can settle referral earnings in Django Admin from `Referral ledger`:
+
+- transfer available commissions to the referrer's wallet
+- mark selected commissions as externally withdrawn
+- reverse selected available commissions
+
 ## Developer API
 
 Users can create or revoke a developer API key from `/api` in Telegram.
@@ -258,6 +264,8 @@ Services:
 - Purchase logic lives in `orders.services.purchase_product`.
 - Payment approval logic lives in `payments.services.approve_payment_request`.
 - Both services use database transactions and row locks.
+- Bot request throttling is stored in the database, so limits survive process
+  restarts and multiple bot workers.
 - Quantity checkout locks all selected stock rows before charging.
 - One `Order item` row is stored per delivered stock item, so multi-quantity
   orders can be refunded or replaced consistently.
