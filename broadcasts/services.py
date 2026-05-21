@@ -14,7 +14,7 @@ def send_broadcast(*, broadcast_id: int) -> Broadcast:
         broadcast.status = Broadcast.Status.SENDING
         broadcast.save(update_fields=["status"])
 
-    users = TelegramUser.objects.filter(is_blocked=False)
+    users = TelegramUser.objects.filter(is_blocked=False, notifications_enabled=True)
     if broadcast.target_language:
         users = users.filter(language=broadcast.target_language)
 

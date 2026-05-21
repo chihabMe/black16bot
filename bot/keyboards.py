@@ -5,33 +5,35 @@ def main_menu():
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
     rows = [
-        [InlineKeyboardButton("Shop", callback_data="shop")],
+        [InlineKeyboardButton("🛒 Shop", callback_data="shop")],
         [
-            InlineKeyboardButton("Top-up Wallet", callback_data="topup"),
-            InlineKeyboardButton("My Profile", callback_data="profile"),
+            InlineKeyboardButton("💳 Top-up", callback_data="topup"),
+            InlineKeyboardButton("👤 Profile", callback_data="profile"),
         ],
         [
-            InlineKeyboardButton("Support", callback_data="support"),
-            InlineKeyboardButton("My Orders", callback_data="orders"),
+            InlineKeyboardButton("🛟 Support", callback_data="support"),
+            InlineKeyboardButton("📦 Orders", callback_data="orders"),
         ],
         [
-            InlineKeyboardButton("Language", callback_data="language"),
-            InlineKeyboardButton("Developer API", callback_data="api"),
+            InlineKeyboardButton("🔔 Notifications", callback_data="notifications"),
+            InlineKeyboardButton("🌐 Language", callback_data="language"),
         ],
         [
-            InlineKeyboardButton("Buy Telegram Account", callback_data="telegram_accounts"),
-            InlineKeyboardButton("Earn", callback_data="earn"),
+            InlineKeyboardButton("✈️ Buy Telegram Account", callback_data="telegram_accounts"),
+            InlineKeyboardButton("🎁 Earn", callback_data="earn"),
         ],
     ]
+    if settings.DEVELOPER_API_ENABLED:
+        rows.insert(4, [InlineKeyboardButton("🔌 Developer API", callback_data="api")])
     if settings.PUBLIC_CHANNEL_URL:
-        rows.append([InlineKeyboardButton("Channel", url=settings.PUBLIC_CHANNEL_URL)])
+        rows.append([InlineKeyboardButton("📣 Channel", url=settings.PUBLIC_CHANNEL_URL)])
     return InlineKeyboardMarkup(rows)
 
 
 def back_menu(target: str = "home"):
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-    return InlineKeyboardMarkup([[InlineKeyboardButton("Back", callback_data=target)]])
+    return InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data=target)]])
 
 
 def orders_menu(orders):
@@ -41,7 +43,7 @@ def orders_menu(orders):
         [InlineKeyboardButton(f"Order #{order.pk} - {order.product.name}", callback_data=f"order:{order.pk}")]
         for order in orders
     ]
-    rows.append([InlineKeyboardButton("Back", callback_data="home")])
+    rows.append([InlineKeyboardButton("⬅️ Back", callback_data="home")])
     return InlineKeyboardMarkup(rows)
 
 
@@ -60,13 +62,13 @@ def product_list_menu(products, page: int, has_next: bool):
             ]
         )
 
-    nav = [InlineKeyboardButton("Refresh", callback_data=f"shop:{page}")]
+    nav = [InlineKeyboardButton("🔄 Refresh", callback_data=f"shop:{page}")]
     if page > 1:
-        nav.append(InlineKeyboardButton("Prev", callback_data=f"shop:{page - 1}"))
+        nav.append(InlineKeyboardButton("⬅️ Prev", callback_data=f"shop:{page - 1}"))
     if has_next:
-        nav.append(InlineKeyboardButton("Next", callback_data=f"shop:{page + 1}"))
+        nav.append(InlineKeyboardButton("Next ➡️", callback_data=f"shop:{page + 1}"))
     rows.append(nav)
-    rows.append([InlineKeyboardButton("Back", callback_data="home")])
+    rows.append([InlineKeyboardButton("⬅️ Back", callback_data="home")])
     return InlineKeyboardMarkup(rows)
 
 
@@ -76,16 +78,16 @@ def product_detail_menu(product_id: int):
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("Qty 1", callback_data=f"buy:{product_id}:1"),
-                InlineKeyboardButton("Qty 2", callback_data=f"buy:{product_id}:2"),
-                InlineKeyboardButton("Qty 5", callback_data=f"buy:{product_id}:5"),
+                InlineKeyboardButton("Buy 1", callback_data=f"buy:{product_id}:1"),
+                InlineKeyboardButton("Buy 2", callback_data=f"buy:{product_id}:2"),
+                InlineKeyboardButton("Buy 5", callback_data=f"buy:{product_id}:5"),
             ],
             [
-                InlineKeyboardButton("Qty 10", callback_data=f"buy:{product_id}:10"),
-                InlineKeyboardButton("View Note", callback_data=f"note:{product_id}"),
+                InlineKeyboardButton("Buy 10", callback_data=f"buy:{product_id}:10"),
+                InlineKeyboardButton("📝 Note", callback_data=f"note:{product_id}"),
             ],
-            [InlineKeyboardButton("Share Link", callback_data=f"share:{product_id}")],
-            [InlineKeyboardButton("Back", callback_data="shop")],
+            [InlineKeyboardButton("🔗 Share", callback_data=f"share:{product_id}")],
+            [InlineKeyboardButton("⬅️ Back", callback_data="shop")],
         ]
     )
 
@@ -105,8 +107,20 @@ def topup_methods_menu():
         ("Other", "other"),
     ]
     rows = [[InlineKeyboardButton(label, callback_data=f"topup_method:{value}")] for label, value in methods]
-    rows.append([InlineKeyboardButton("Back", callback_data="home")])
+    rows.append([InlineKeyboardButton("⬅️ Back", callback_data="home")])
     return InlineKeyboardMarkup(rows)
+
+
+def notifications_menu(enabled: bool):
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+    label = "🔕 Turn off notifications" if enabled else "🔔 Turn on notifications"
+    return InlineKeyboardMarkup(
+        [
+            [InlineKeyboardButton(label, callback_data="notifications_toggle")],
+            [InlineKeyboardButton("⬅️ Back", callback_data="home")],
+        ]
+    )
 
 
 def language_menu():

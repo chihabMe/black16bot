@@ -8,6 +8,7 @@ from django.utils.html import format_html
 from audit.services import log_admin_action
 from catalog.forms import BulkStockUploadForm
 from catalog.models import Product, StockItem
+from catalog.notifications import notify_users_about_product
 from catalog.services import bulk_create_stock
 from security.crypto import decrypt_text
 
@@ -44,6 +45,7 @@ class ProductAdmin(admin.ModelAdmin):
     search_fields = ("name", "description", "note_md", "category", "country_name", "country_code")
     list_editable = ("price", "is_active", "sort_order")
     inlines = (StockItemInline,)
+    actions = ("notify_selected_products",)
 
     def get_queryset(self, request):
         return super().get_queryset(request).with_stock_counts()
@@ -85,6 +87,15 @@ class ProductAdmin(admin.ModelAdmin):
                     message=f"Uploaded {count} stock items",
                     metadata={"count": count},
                 )
+                if form.cleaned_data["notify_users"] and count:
+                    sent, failed = notify_users_about_product(product_id=product.pk, event="stock")
+                    log_admin_action(
+                        action="notification.stock",
+                        actor=request.user,
+                        target=product,
+                        message=f"Notified users about stock update: {sent} sent, {failed} failed",
+                        metadata={"sent": sent, "failed": failed},
+                    )
                 self.message_user(request, f"Added {count} stock items to {product.name}.")
                 return redirect("admin:catalog_product_change", product.pk)
         else:
@@ -98,6 +109,23 @@ class ProductAdmin(admin.ModelAdmin):
             "title": f"Bulk upload stock for {product.name}",
         }
         return TemplateResponse(request, "admin/catalog/bulk_stock_upload.html", context)
+
+    @admin.action(description="Notify users about selected products")
+    def notify_selected_products(self, request, queryset):
+        total_sent = 0
+        total_failed = 0
+        for product in queryset.filter(is_active=True):
+            sent, failed = notify_users_about_product(product_id=product.pk, event="product")
+            total_sent += sent
+            total_failed += failed
+            log_admin_action(
+                action="notification.product",
+                actor=request.user,
+                target=product,
+                message=f"Notified users about product: {sent} sent, {failed} failed",
+                metadata={"sent": sent, "failed": failed},
+            )
+        self.message_user(request, f"Notifications sent: {total_sent}. Failed: {total_failed}.")
 
 
 @admin.register(StockItem)

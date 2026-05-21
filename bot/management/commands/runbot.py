@@ -28,6 +28,7 @@ class Command(BaseCommand):
         application.add_handler(CommandHandler("topup_amount", handlers.topup_amount))
         application.add_handler(CommandHandler("binance_topup", handlers.binance_topup))
         application.add_handler(CommandHandler("referral", handlers.show_referral))
+        application.add_handler(CommandHandler("notifications", handlers.show_notifications))
         application.add_handler(CommandHandler("language", handlers.show_language))
         application.add_handler(CommandHandler("support", handlers.show_support))
         application.add_handler(CommandHandler("support_ticket", handlers.support_ticket))

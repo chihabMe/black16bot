@@ -16,6 +16,7 @@ from bot.keyboards import (
     api_menu,
     language_menu,
     main_menu,
+    notifications_menu,
     orders_menu,
     pending_payments_menu,
     product_detail_menu,
@@ -44,7 +45,11 @@ async def start(update, context):
     user = await sync_to_async(get_user)(update)
     if update.message and getattr(context, "args", None):
         await sync_to_async(apply_referral_code)(user=user, referral_code=context.args[0])
-    text = f"Welcome to our store!\n\nYour balance: {user.balance} USDT"
+    text = (
+        "👋 Welcome to Black16 Store\n\n"
+        f"💰 Balance: {user.balance} USDT\n"
+        "🛒 Choose a product, top up your wallet, or check your orders."
+    )
     if update.message:
         await update.message.reply_text(text, reply_markup=main_menu())
     else:
@@ -67,7 +72,7 @@ async def show_shop(update, context, page: int = 1, product_type: str = ""):
         return list(product_page.object_list), product_page.number, product_page.has_next()
 
     products, current_page, has_next = await sync_to_async(load_products)()
-    text = "Available Products:" if products else "No products are available right now."
+    text = "🛒 Available products" if products else "No products are available right now."
     await send_or_edit(update, text, product_list_menu(products, current_page, has_next))
 
 
@@ -83,13 +88,13 @@ async def show_product(update, context, product_id: int):
 
     stock = getattr(product, "available_stock_count", product.available_stock_count)
     text = (
-        f"{product.name}\n\n"
+        f"🛍️ {product.name}\n\n"
         f"{product.description or 'Digital product'}\n\n"
-        f"Price: {product.price} USDT\n"
-        f"Stock: {stock}"
+        f"💵 Price: {product.price} USDT\n"
+        f"📦 Stock: {stock}"
     )
     if product.product_type == Product.ProductType.TELEGRAM_ACCOUNT:
-        text += f"\nCountry: {product.country_name or product.country_code or '-'}"
+        text += f"\n🌍 Country: {product.country_name or product.country_code or '-'}"
     await send_or_edit(update, text, product_detail_menu(product.pk))
 
 
@@ -110,7 +115,7 @@ async def share_product(update, context, product_id: int):
     bot_username = context.bot.username or "your_bot"
     await send_or_edit(
         update,
-        f"Share this product:\nhttps://t.me/{bot_username}?start=product_{product_id}",
+        f"🔗 Share this product:\nhttps://t.me/{bot_username}?start=product_{product_id}",
         product_detail_menu(product_id),
     )
 
@@ -137,11 +142,11 @@ async def buy_product(update, context, product_id: int, quantity: int = 1):
         return
 
     text = (
-        f"Order #{result.order.pk} completed.\n\n"
-        f"Product: {result.order.product.name}\n\n"
-        f"Quantity: {result.order.quantity}\n"
-        f"Total: {result.order.price_paid} USDT\n\n"
-        f"Your item(s):\n{decrypt_text(result.order.delivered_payload)}"
+        f"✅ Order #{result.order.pk} completed\n\n"
+        f"🛍️ Product: {result.order.product.name}\n"
+        f"📦 Quantity: {result.order.quantity}\n"
+        f"💵 Total: {result.order.price_paid} USDT\n\n"
+        f"🔐 Your item(s):\n{decrypt_text(result.order.delivered_payload)}"
     )
     await send_or_edit(update, text, back_menu("orders"))
 
@@ -149,10 +154,11 @@ async def buy_product(update, context, product_id: int, quantity: int = 1):
 async def show_profile(update, context):
     user = await sync_to_async(get_user)(update)
     text = (
-        "User Profile\n\n"
+        "👤 Profile\n\n"
         f"ID: {user.telegram_id}\n"
         f"Username: @{user.username or '-'}\n"
         f"Balance: {user.balance} USDT\n"
+        f"Notifications: {'on' if user.notifications_enabled else 'off'}\n"
         f"Language: {user.language}\n"
         f"Joined: {user.joined_at:%Y-%m-%d}"
     )
@@ -167,9 +173,9 @@ async def show_orders(update, context):
 
     orders = await sync_to_async(load_orders)()
     if not orders:
-        await send_or_edit(update, "You have no orders yet.", back_menu("home"))
+        await send_or_edit(update, "📭 You have no orders yet.", back_menu("home"))
         return
-    await send_or_edit(update, "Your recent orders:", orders_menu(orders))
+    await send_or_edit(update, "📦 Your recent orders:", orders_menu(orders))
 
 
 async def show_order_detail(update, context, order_id: int):
@@ -188,13 +194,13 @@ async def show_order_detail(update, context, order_id: int):
         return
 
     text = (
-        f"Order #{order.pk}\n\n"
-        f"Product: {order.product.name}\n"
-        f"Price: {order.price_paid} USDT\n"
-        f"Quantity: {order.quantity}\n"
+        f"📦 Order #{order.pk}\n\n"
+        f"🛍️ Product: {order.product.name}\n"
+        f"💵 Price: {order.price_paid} USDT\n"
+        f"📦 Quantity: {order.quantity}\n"
         f"Status: {order.status}\n"
         f"Created: {order.created_at:%Y-%m-%d %H:%M}\n\n"
-        f"Delivered item:\n{decrypt_text(order.delivered_payload) if order.delivered_payload else decrypt_text(order.stock_item.secret_content)}"
+        f"🔐 Delivered item:\n{decrypt_text(order.delivered_payload) if order.delivered_payload else decrypt_text(order.stock_item.secret_content)}"
     )
     await send_or_edit(update, text, back_menu("orders"))
 
@@ -229,7 +235,7 @@ async def cancel_payment(update, context, payment_id: int):
 
 
 async def show_topup(update, context):
-    await send_or_edit(update, "Top Up Wallet\n\nSelect a payment method:", topup_methods_menu())
+    await send_or_edit(update, "💳 Top up wallet\n\nSelect a payment method:", topup_methods_menu())
 
 
 async def create_topup_request(update, context, method: str):
@@ -374,7 +380,7 @@ async def admin_stats(update, context):
 
     stats = await sync_to_async(load_stats)()
     await update.message.reply_text(
-        "Admin stats\n\n"
+        "📊 Admin stats\n\n"
         f"Users: {stats['users']}\n"
         f"Products: {stats['products']}\n"
         f"Orders: {stats['orders']}\n"
@@ -383,7 +389,7 @@ async def admin_stats(update, context):
 
 
 async def show_language(update, context):
-    await send_or_edit(update, "Please select your language:", language_menu())
+    await send_or_edit(update, "🌐 Please select your language:", language_menu())
 
 
 async def set_language(update, context, language: str):
@@ -393,9 +399,28 @@ async def set_language(update, context, language: str):
     await send_or_edit(update, "Language updated.", back_menu("home"))
 
 
+async def show_notifications(update, context):
+    user = await sync_to_async(get_user)(update)
+    status = "on" if user.notifications_enabled else "off"
+    text = (
+        "🔔 Notifications\n\n"
+        f"Status: {status}\n\n"
+        "When enabled, you will receive updates for new products and fresh stock."
+    )
+    await send_or_edit(update, text, notifications_menu(user.notifications_enabled))
+
+
+async def toggle_notifications(update, context):
+    user = await sync_to_async(get_user)(update)
+    user.notifications_enabled = not user.notifications_enabled
+    await sync_to_async(user.save)(update_fields=["notifications_enabled"])
+    status = "enabled" if user.notifications_enabled else "disabled"
+    await send_or_edit(update, f"🔔 Notifications {status}.", notifications_menu(user.notifications_enabled))
+
+
 async def show_support(update, context):
     text = (
-        "Support\n\n"
+        "🛟 Support\n\n"
         "If you have an issue, use:\n"
         "/support_ticket your message here"
     )
@@ -417,7 +442,7 @@ async def show_referral(update, context):
     bot_username = context.bot.username or "your_bot"
     link = f"https://t.me/{bot_username}?start={user.referral_code}"
     text = (
-        "Earn / Referral\n\n"
+        "🎁 Earn / Referral\n\n"
         f"Referred total: {stats['total_referred']}\n"
         f"Total earned: {stats['total_earned']} USDT\n"
         f"Available: {stats['available']} USDT\n\n"
@@ -432,7 +457,7 @@ async def show_telegram_accounts(update, context):
 
 async def help_command(update, context):
     await update.message.reply_text(
-        "Commands\n\n"
+        "🤖 Commands\n\n"
         "/start - main menu\n"
         "/shop - product catalog\n"
         "/telegram_accounts - country account marketplace\n"
@@ -442,8 +467,8 @@ async def help_command(update, context):
         "/topup_amount 10 method proof - manual top-up request\n"
         "/binance_topup 10 txid [network] - auto Binance deposit check\n"
         "/referral - referral dashboard\n"
+        "/notifications - product and stock alerts\n"
         "/support_ticket message - create support ticket\n"
-        "/api - developer API\n"
         "/language - change language"
     )
 
@@ -460,6 +485,9 @@ async def support_ticket(update, context):
 
 
 async def show_api(update, context):
+    if not settings.DEVELOPER_API_ENABLED:
+        await send_or_edit(update, "🔌 Developer API is disabled for now.", back_menu("home"))
+        return
     user = await sync_to_async(get_user)(update)
 
     def load_key():
@@ -485,6 +513,9 @@ async def show_api(update, context):
 
 
 async def create_api_key(update, context):
+    if not settings.DEVELOPER_API_ENABLED:
+        await send_or_edit(update, "🔌 Developer API is disabled for now.", back_menu("home"))
+        return
     user = await sync_to_async(get_user)(update)
 
     def create_key():
@@ -501,12 +532,18 @@ async def create_api_key(update, context):
 
 
 async def revoke_api_key(update, context):
+    if not settings.DEVELOPER_API_ENABLED:
+        await send_or_edit(update, "🔌 Developer API is disabled for now.", back_menu("home"))
+        return
     user = await sync_to_async(get_user)(update)
     count = await sync_to_async(revoke_user_api_keys)(user_id=user.pk)
     await send_or_edit(update, f"Revoked {count} active API key(s).", api_menu(False))
 
 
 async def set_api_webhook(update, context):
+    if not settings.DEVELOPER_API_ENABLED:
+        await update.message.reply_text("Developer API is disabled for now.")
+        return
     user = await sync_to_async(get_user)(update)
     if not context.args:
         await update.message.reply_text("Use:\n/api_webhook https://example.com/webhook")
@@ -531,6 +568,9 @@ async def set_api_webhook(update, context):
 
 
 async def api_docs(update, context):
+    if not settings.DEVELOPER_API_ENABLED:
+        await update.message.reply_text("Developer API is disabled for now.")
+        return
     await update.message.reply_text(
         "Developer API\n\n"
         "Auth: Authorization: Bearer API_KEY\n\n"
@@ -578,6 +618,10 @@ async def callback_router(update, context):
         await create_topup_request(update, context, data.split(":", 1)[1])
     elif data == "language":
         await show_language(update, context)
+    elif data == "notifications":
+        await show_notifications(update, context)
+    elif data == "notifications_toggle":
+        await toggle_notifications(update, context)
     elif data.startswith("lang:"):
         await set_language(update, context, data.split(":", 1)[1])
     elif data == "support":

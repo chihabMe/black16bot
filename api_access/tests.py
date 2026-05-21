@@ -25,6 +25,13 @@ class DeveloperApiTests(TestCase):
 
         self.assertEqual(response.status_code, 401)
 
+    @override_settings(DEVELOPER_API_ENABLED=False)
+    def test_products_can_be_disabled_globally(self):
+        response = self.client.get("/api/v1/products/", **self.auth())
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["error"], "developer_api_disabled")
+
     def test_products_lists_active_products(self):
         response = self.client.get("/api/v1/products/", **self.auth())
 

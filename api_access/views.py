@@ -1,6 +1,7 @@
 import json
 from decimal import Decimal
 
+from django.conf import settings
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -21,6 +22,8 @@ def bearer_token(request) -> str:
 
 
 def require_api_key(request):
+    if not settings.DEVELOPER_API_ENABLED:
+        return None, JsonResponse({"error": "developer_api_disabled"}, status=403)
     api_key = authenticate_api_key(bearer_token(request))
     if api_key is None:
         return None, JsonResponse({"error": "invalid_api_key"}, status=401)
