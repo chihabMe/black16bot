@@ -1,7 +1,7 @@
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
-from bot.keyboards import main_menu
+from bot.keyboards import main_menu, topup_methods_menu
 from bot.models import BotRateLimit
 from bot.rate_limit import is_rate_limited
 
@@ -33,3 +33,18 @@ class MainMenuFeatureFlagTests(TestCase):
         self.assertNotIn("✈️ Buy Telegram Account", labels)
         self.assertNotIn("🎁 Earn", labels)
         self.assertNotIn("🔌 Developer API", labels)
+
+
+class TopupMenuTests(TestCase):
+    def test_topup_menu_only_shows_enabled_methods(self):
+        markup = topup_methods_menu()
+        labels = [button.text for row in markup.inline_keyboard for button in row]
+
+        self.assertIn("Binance", labels)
+        self.assertIn("Bybit", labels)
+        self.assertIn("USDT BEP-20", labels)
+        self.assertIn("USDT TRC-20", labels)
+        self.assertNotIn("CryptoBot", labels)
+        self.assertNotIn("TON", labels)
+        self.assertNotIn("TRON", labels)
+        self.assertNotIn("Other", labels)

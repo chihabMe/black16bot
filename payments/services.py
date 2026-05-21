@@ -9,6 +9,7 @@ from django.utils import timezone
 from accounts.models import ReferralLedger, TelegramUser
 from audit.services import log_admin_action
 from bot.telegram_client import notify_admins, send_telegram_message
+from payments.methods import ENABLED_PAYMENT_METHODS
 from payments.models import PaymentRequest
 from wallet.models import WalletTransaction
 
@@ -31,8 +32,7 @@ def create_payment_request(
 ) -> PaymentRequest:
     if amount <= 0:
         raise PaymentRequestError("Top-up amount must be greater than zero.")
-    valid_methods = {choice.value for choice in PaymentRequest.Method}
-    if method not in valid_methods:
+    if method not in ENABLED_PAYMENT_METHODS:
         raise PaymentRequestError("Unsupported payment method.")
 
     payment = PaymentRequest.objects.create(

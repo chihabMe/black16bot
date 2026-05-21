@@ -1,6 +1,7 @@
 from django.contrib import admin, messages
 
 from payments.models import PaymentRequest, VerifiedDeposit
+from payments.methods import enabled_payment_method_choices
 from payments.services import PaymentApprovalError, approve_payment_request, reject_payment_request
 
 
@@ -12,6 +13,11 @@ class PaymentRequestAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at", "approved_at", "rejected_at")
     autocomplete_fields = ("user", "approved_by")
     actions = ("approve_selected", "reject_selected")
+
+    def formfield_for_choice_field(self, db_field, request, **kwargs):
+        if db_field.name == "method":
+            kwargs["choices"] = enabled_payment_method_choices()
+        return super().formfield_for_choice_field(db_field, request, **kwargs)
 
     @admin.action(description="Approve selected payment requests")
     def approve_selected(self, request, queryset):

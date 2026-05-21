@@ -97,19 +97,9 @@ def product_detail_menu(product_id: int):
 
 def topup_methods_menu():
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    from payments.methods import enabled_payment_method_choices
 
-    methods = [
-        ("Binance Deposit", "binance_deposit"),
-        ("Binance Pay", "binance_pay"),
-        ("Bybit Pay", "bybit_pay"),
-        ("CryptoBot", "cryptobot"),
-        ("USDT BEP-20", "usdt_bep20"),
-        ("USDT TRC-20", "usdt_trc20"),
-        ("TON", "ton"),
-        ("TRON", "tron"),
-        ("Other", "other"),
-    ]
-    rows = [[InlineKeyboardButton(label, callback_data=f"topup_method:{value}")] for label, value in methods]
+    rows = [[InlineKeyboardButton(label, callback_data=f"topup_method:{value}")] for value, label in enabled_payment_method_choices()]
     rows.append([InlineKeyboardButton("⬅️ Back", callback_data="home")])
     return InlineKeyboardMarkup(rows)
 

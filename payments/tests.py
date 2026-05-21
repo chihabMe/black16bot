@@ -88,7 +88,7 @@ class PaymentRequestServiceTests(TransactionTestCase):
             create_payment_request(
                 user_id=self.user.pk,
                 amount=Decimal("0.00"),
-                method=PaymentRequest.Method.CRYPTOBOT,
+                method=PaymentRequest.Method.BINANCE_PAY,
             )
 
     def test_create_payment_request_rejects_unsupported_method(self):
@@ -97,6 +97,14 @@ class PaymentRequestServiceTests(TransactionTestCase):
                 user_id=self.user.pk,
                 amount=Decimal("10.00"),
                 method="cash",
+            )
+
+    def test_create_payment_request_rejects_disabled_legacy_method(self):
+        with self.assertRaises(PaymentRequestError):
+            create_payment_request(
+                user_id=self.user.pk,
+                amount=Decimal("10.00"),
+                method=PaymentRequest.Method.CRYPTOBOT,
             )
 
     @patch("payments.binance.notify_admins", return_value=1)

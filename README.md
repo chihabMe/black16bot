@@ -87,28 +87,23 @@ The first version uses manual top-up review. A user can create a payment request
 with:
 
 ```txt
-/topup_amount 10 cryptobot transaction-id-or-note
+/topup_amount 10 binance_pay transaction-id-or-note
 ```
 
 Users can also attach a screenshot/photo and use the same command as the photo
 caption:
 
 ```txt
-/topup_amount 10 cryptobot transaction-id-or-note
+/topup_amount 10 binance_pay transaction-id-or-note
 ```
 
 Supported method codes:
 
 ```txt
-binance_deposit
 binance_pay
 bybit_pay
-cryptobot
 usdt_bep20
 usdt_trc20
-ton
-tron
-other
 ```
 
 Admin approval happens in Django Admin under `Payment requests`.
