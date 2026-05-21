@@ -1,0 +1,45 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: black16bot
+      POSTGRES_USER: black16bot
+      POSTGRES_PASSWORD: black16bot
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U black16bot -d black16bot"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build: .
+    command: python manage.py runserver 0.0.0.0:8000
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgres://black16bot:black16bot@db:5432/black16bot
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  bot:
+    build: .
+    command: python manage.py runbot
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgres://black16bot:black16bot@db:5432/black16bot
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
