@@ -1,0 +1,13 @@
+.git
+.venv
+venv
+__pycache__
+*.pyc
+.pytest_cache
+.coverage
+htmlcov
+staticfiles
+media
+video_frames
+*.mp4
+db.sqlite3
