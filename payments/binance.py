@@ -91,6 +91,9 @@ def verify_binance_deposit(
     deposit_amount = Decimal(str(deposit.get("amount", "0")))
     if deposit_amount < amount:
         raise BinanceDepositError(f"Deposit amount is too small: found {deposit_amount}, expected {amount}.")
+    credited_amount = deposit_amount.quantize(Decimal("0.01"))
+    if credited_amount <= 0:
+        raise BinanceDepositError("Deposit amount is too small after wallet rounding.")
 
     with transaction.atomic():
         if VerifiedDeposit.objects.select_for_update().filter(
@@ -102,17 +105,17 @@ def verify_binance_deposit(
         user = TelegramUser.objects.select_for_update().get(pk=user_id)
         payment = PaymentRequest.objects.create(
             user=user,
-            amount=amount,
+            amount=credited_amount,
             method=PaymentRequest.Method.BINANCE_DEPOSIT,
             status=PaymentRequest.Status.APPROVED,
             proof_text=txid,
             approved_at=timezone.now(),
             admin_note="Auto-approved by Binance deposit TXID check.",
         )
-        TelegramUser.objects.filter(pk=user.pk).update(balance=F("balance") + amount)
+        TelegramUser.objects.filter(pk=user.pk).update(balance=F("balance") + credited_amount)
         WalletTransaction.objects.create(
             user=user,
-            amount=amount,
+            amount=credited_amount,
             transaction_type=WalletTransaction.Type.TOPUP,
             status=WalletTransaction.Status.COMPLETED,
             related_payment=payment,
@@ -132,12 +135,12 @@ def verify_binance_deposit(
 
     send_telegram_message(
         user.telegram_id,
-        f"Your Binance top-up was verified automatically.\nAmount credited: {amount} USDT",
+        f"Your Binance top-up was verified automatically.\nAmount credited: {credited_amount} USDT",
     )
     notify_admins(
         "Binance top-up auto-approved\n\n"
         f"User ID: {user.telegram_id}\n"
-        f"Amount: {amount} USDT\n"
+        f"Amount: {credited_amount} USDT\n"
         f"TXID: {txid}"
     )
     return verified

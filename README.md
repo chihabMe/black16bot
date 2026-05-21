@@ -17,6 +17,8 @@ DJANGO_SECRET_KEY=
 DATABASE_URL=
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_ADMIN_IDS=
+STOCK_ENCRYPTION_KEY=
+WEBHOOK_SIGNING_SECRET=
 ```
 
 3. Install dependencies:
@@ -140,11 +142,19 @@ Rules:
 - Only confirmed Binance deposits are credited.
 - The coin must be `USDT`.
 - The deposit amount must be at least the requested top-up amount.
+- If the confirmed deposit is larger than the requested amount, the full
+  confirmed deposit amount is credited to avoid burning the TXID.
 - If a network is provided, it must match the Binance deposit network.
 - Each TXID can be credited only once.
 
 For safest operation, use a read-only Binance API key. Do not enable trading or
 withdrawals for this bot.
+
+Expired manual top-up requests can be cleared by cron or a scheduler with:
+
+```bash
+python3 manage.py expire_payments
+```
 
 ## Stock Management
 
@@ -158,6 +168,13 @@ To bulk upload stock:
 4. Submit the form.
 
 Each line becomes one deliverable stock item.
+
+Stock secrets and delivered order payloads are encrypted before storage. If you
+already imported plaintext stock before enabling this version, run:
+
+```bash
+python3 manage.py encrypt_existing_secrets
+```
 
 ## Support And Admin Bot Commands
 
@@ -209,13 +226,19 @@ curl -X POST \
 ```
 
 API orders use the same transaction-safe purchase service as Telegram orders.
+Each API key has admin-managed controls for order permission, max quantity per
+order, daily spend limit, and per-minute order rate limit. API usage is logged
+under `API usage logs`.
+
 Set an API webhook from Telegram with:
 
 ```txt
 /api_webhook https://example.com/webhook
 ```
 
-Webhook payloads are signed with `X-Black16-Signature`.
+Webhook payloads are signed with `X-Black16-Signature`. Webhook URLs must use
+HTTPS and cannot resolve to private, loopback, link-local, reserved, or
+multicast IP addresses.
 
 ## Docker Compose
 
@@ -236,5 +259,12 @@ Services:
 - Payment approval logic lives in `payments.services.approve_payment_request`.
 - Both services use database transactions and row locks.
 - Quantity checkout locks all selected stock rows before charging.
+- One `Order item` row is stored per delivered stock item, so multi-quantity
+  orders can be refunded or replaced consistently.
+- Use a strong `STOCK_ENCRYPTION_KEY` and keep it stable. Changing it without a
+  migration plan makes existing encrypted stock unreadable.
+- Production should set `DJANGO_DEBUG=False`, a real `DJANGO_SECRET_KEY`, a
+  separate `WEBHOOK_SIGNING_SECRET`, correct `DJANGO_ALLOWED_HOSTS`, and HTTPS
+  cookie/redirect settings.
 - Admin actions are recorded in `Admin audit logs`.
 - Do not update user balances directly outside service functions unless it is a deliberate admin correction.

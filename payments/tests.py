@@ -12,6 +12,7 @@ from payments.services import (
     approve_payment_request,
     cancel_payment_request,
     create_payment_request,
+    expire_pending_payment_requests,
     reject_payment_request,
 )
 from wallet.models import WalletTransaction
@@ -118,8 +119,9 @@ class PaymentRequestServiceTests(TransactionTestCase):
         )
 
         self.user.refresh_from_db()
-        self.assertEqual(self.user.balance, Decimal("10.00"))
+        self.assertEqual(self.user.balance, Decimal("15.00"))
         self.assertEqual(verified.txid, "tx123")
+        self.assertEqual(verified.payment_request.amount, Decimal("15.00"))
         self.assertEqual(verified.payment_request.status, PaymentRequest.Status.APPROVED)
         self.assertEqual(VerifiedDeposit.objects.count(), 1)
 
@@ -130,5 +132,29 @@ class PaymentRequestServiceTests(TransactionTestCase):
                 txid="tx123",
                 network="BSC",
             )
+
+    def test_expire_pending_payment_requests_marks_old_requests(self):
+        from django.utils import timezone
+
+        old_payment = PaymentRequest.objects.create(
+            user=self.user,
+            amount=Decimal("5.00"),
+            method=PaymentRequest.Method.CRYPTOBOT,
+            expires_at=timezone.now() - timezone.timedelta(minutes=1),
+        )
+        fresh_payment = PaymentRequest.objects.create(
+            user=self.user,
+            amount=Decimal("5.00"),
+            method=PaymentRequest.Method.CRYPTOBOT,
+            expires_at=timezone.now() + timezone.timedelta(minutes=1),
+        )
+
+        count = expire_pending_payment_requests()
+
+        old_payment.refresh_from_db()
+        fresh_payment.refresh_from_db()
+        self.assertEqual(count, 1)
+        self.assertEqual(old_payment.status, PaymentRequest.Status.EXPIRED)
+        self.assertEqual(fresh_payment.status, PaymentRequest.Status.PENDING)
 
 # Create your tests here.
