@@ -10,6 +10,7 @@ from accounts.models import ReferralLedger
 from accounts.services import apply_referral_code, upsert_telegram_user
 from api_access.models import DeveloperApiKey
 from api_access.services import revoke_user_api_keys
+from api_access.webhooks import UnsafeWebhookUrl, validate_webhook_url
 from bot.keyboards import (
     back_menu,
     api_menu,
@@ -29,6 +30,7 @@ from payments.models import PaymentRequest
 from payments.binance import BinanceDepositError, verify_binance_deposit
 from payments.services import PaymentApprovalError, PaymentRequestError, cancel_payment_request, create_payment_request
 from support.services import create_support_ticket
+from security.crypto import decrypt_text
 
 
 PAGE_SIZE = 8
@@ -139,7 +141,7 @@ async def buy_product(update, context, product_id: int, quantity: int = 1):
         f"Product: {result.order.product.name}\n\n"
         f"Quantity: {result.order.quantity}\n"
         f"Total: {result.order.price_paid} USDT\n\n"
-        f"Your item(s):\n{result.order.delivered_payload}"
+        f"Your item(s):\n{decrypt_text(result.order.delivered_payload)}"
     )
     await send_or_edit(update, text, back_menu("orders"))
 
@@ -192,7 +194,7 @@ async def show_order_detail(update, context, order_id: int):
         f"Quantity: {order.quantity}\n"
         f"Status: {order.status}\n"
         f"Created: {order.created_at:%Y-%m-%d %H:%M}\n\n"
-        f"Delivered item:\n{order.delivered_payload or order.stock_item.secret_content}"
+        f"Delivered item:\n{decrypt_text(order.delivered_payload) if order.delivered_payload else decrypt_text(order.stock_item.secret_content)}"
     )
     await send_or_edit(update, text, back_menu("orders"))
 
@@ -306,7 +308,7 @@ async def binance_topup(update, context):
 
     await update.message.reply_text(
         f"Binance top-up verified.\n"
-        f"Credited: {amount} USDT\n"
+        f"Credited: {verified.payment_request.amount} USDT\n"
         f"Deposit amount found: {verified.amount} {verified.coin}"
     )
 
@@ -510,8 +512,10 @@ async def set_api_webhook(update, context):
         await update.message.reply_text("Use:\n/api_webhook https://example.com/webhook")
         return
     webhook_url = context.args[0].strip()
-    if not webhook_url.startswith(("https://", "http://")):
-        await update.message.reply_text("Webhook URL must start with http:// or https://")
+    try:
+        await sync_to_async(validate_webhook_url)(webhook_url)
+    except UnsafeWebhookUrl as exc:
+        await update.message.reply_text(f"Invalid webhook URL: {exc}")
         return
 
     def update_key():

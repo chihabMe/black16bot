@@ -1,12 +1,37 @@
 import hashlib
 import hmac
+import ipaddress
 import json
 import logging
+import socket
+from urllib.parse import urlparse
 import urllib.request
 
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
+
+
+class UnsafeWebhookUrl(ValueError):
+    pass
+
+
+def validate_webhook_url(url: str) -> None:
+    parsed = urlparse(url)
+    if parsed.scheme != "https":
+        raise UnsafeWebhookUrl("Webhook URL must use https://")
+    if not parsed.hostname:
+        raise UnsafeWebhookUrl("Webhook URL must include a hostname.")
+
+    try:
+        addresses = socket.getaddrinfo(parsed.hostname, parsed.port or 443, proto=socket.IPPROTO_TCP)
+    except socket.gaierror as exc:
+        raise UnsafeWebhookUrl("Webhook hostname could not be resolved.") from exc
+
+    for address in addresses:
+        ip = ipaddress.ip_address(address[4][0])
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+            raise UnsafeWebhookUrl("Webhook URL cannot resolve to a private or reserved address.")
 
 
 def sign_payload(payload: dict) -> str:
@@ -16,6 +41,11 @@ def sign_payload(payload: dict) -> str:
 
 def send_order_webhook(*, api_key, order, secret_content: str) -> bool:
     if not api_key.webhook_url:
+        return False
+    try:
+        validate_webhook_url(api_key.webhook_url)
+    except UnsafeWebhookUrl:
+        logger.warning("Blocked unsafe API webhook URL for key %s", api_key.pk)
         return False
 
     payload = {
