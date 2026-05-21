@@ -428,6 +428,9 @@ async def show_support(update, context):
 
 
 async def show_referral(update, context):
+    if not settings.REFERRAL_FEATURE_ENABLED:
+        await send_or_edit(update, "🎁 Earn is disabled for now.", back_menu("home"))
+        return
     user = await sync_to_async(get_user)(update)
 
     def load_stats():
@@ -452,6 +455,9 @@ async def show_referral(update, context):
 
 
 async def show_telegram_accounts(update, context):
+    if not settings.TELEGRAM_ACCOUNTS_ENABLED:
+        await send_or_edit(update, "✈️ Telegram account purchases are disabled for now.", back_menu("home"))
+        return
     await show_shop(update, context, product_type=Product.ProductType.TELEGRAM_ACCOUNT)
 
 
@@ -460,13 +466,11 @@ async def help_command(update, context):
         "🤖 Commands\n\n"
         "/start - main menu\n"
         "/shop - product catalog\n"
-        "/telegram_accounts - country account marketplace\n"
         "/orders - order history\n"
         "/payments - pending top-ups\n"
         "/topup - top-up methods\n"
         "/topup_amount 10 method proof - manual top-up request\n"
         "/binance_topup 10 txid [network] - auto Binance deposit check\n"
-        "/referral - referral dashboard\n"
         "/notifications - product and stock alerts\n"
         "/support_ticket message - create support ticket\n"
         "/language - change language"

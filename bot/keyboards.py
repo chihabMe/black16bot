@@ -18,13 +18,16 @@ def main_menu():
             InlineKeyboardButton("🔔 Notifications", callback_data="notifications"),
             InlineKeyboardButton("🌐 Language", callback_data="language"),
         ],
-        [
-            InlineKeyboardButton("✈️ Buy Telegram Account", callback_data="telegram_accounts"),
-            InlineKeyboardButton("🎁 Earn", callback_data="earn"),
-        ],
     ]
     if settings.DEVELOPER_API_ENABLED:
         rows.insert(4, [InlineKeyboardButton("🔌 Developer API", callback_data="api")])
+    account_earn_row = []
+    if settings.TELEGRAM_ACCOUNTS_ENABLED:
+        account_earn_row.append(InlineKeyboardButton("✈️ Buy Telegram Account", callback_data="telegram_accounts"))
+    if settings.REFERRAL_FEATURE_ENABLED:
+        account_earn_row.append(InlineKeyboardButton("🎁 Earn", callback_data="earn"))
+    if account_earn_row:
+        rows.append(account_earn_row)
     if settings.PUBLIC_CHANNEL_URL:
         rows.append([InlineKeyboardButton("📣 Channel", url=settings.PUBLIC_CHANNEL_URL)])
     return InlineKeyboardMarkup(rows)
