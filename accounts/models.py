@@ -60,6 +60,15 @@ class ReferralLedger(models.Model):
     )
     commission_amount = models.DecimalField(max_digits=12, decimal_places=2)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.AVAILABLE, db_index=True)
+    processed_by = models.ForeignKey(
+        "auth.User",
+        null=True,
+        blank=True,
+        related_name="processed_referral_entries",
+        on_delete=models.SET_NULL,
+    )
+    processed_at = models.DateTimeField(null=True, blank=True)
+    admin_note = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
