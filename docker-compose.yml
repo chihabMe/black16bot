@@ -41,7 +41,8 @@ services:
   payment_verifier:
     build: .
     command: >
-      sh -c "while true; do
+      sh -c "python manage.py migrate --noinput;
+      while true; do
       python manage.py verify_payments --limit 100;
       python manage.py expire_payments;
       sleep 60;
