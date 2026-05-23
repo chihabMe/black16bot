@@ -48,3 +48,7 @@ class TopupMenuTests(TestCase):
         self.assertNotIn("TON", labels)
         self.assertNotIn("TRON", labels)
         self.assertNotIn("Other", labels)
+
+        callbacks = [button.callback_data for row in markup.inline_keyboard for button in row]
+        self.assertIn("topup_method:binance_deposit", callbacks)
+        self.assertNotIn("topup_method:binance_pay", callbacks)

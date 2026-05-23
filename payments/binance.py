@@ -144,3 +144,82 @@ def verify_binance_deposit(
         f"TXID: {txid}"
     )
     return verified
+
+
+def verify_pending_binance_payment(*, payment_id: int) -> VerifiedDeposit:
+    with transaction.atomic():
+        payment = PaymentRequest.objects.select_for_update().select_related("user").get(pk=payment_id)
+        if payment.status != PaymentRequest.Status.PENDING:
+            raise BinanceDepositError("Only pending payment requests can be verified.")
+        if payment.method != PaymentRequest.Method.BINANCE_DEPOSIT:
+            raise BinanceDepositError("Payment request is not a Binance payment.")
+        txid = payment.proof_text.strip()
+        if not txid:
+            raise BinanceDepositError("Payment request does not include a transaction ID.")
+        if VerifiedDeposit.objects.select_for_update().filter(
+            provider=VerifiedDeposit.Provider.BINANCE,
+            txid=txid,
+        ).exists():
+            raise BinanceDepositError("This transaction ID was already used.")
+        expected_amount = payment.payable_amount or payment.amount
+
+    deposit = fetch_binance_deposit_by_txid(txid=txid, coin="USDT")
+    if not deposit:
+        raise BinanceDepositError("Deposit transaction was not found on Binance.")
+    if int(deposit.get("status", -1)) != 1:
+        raise BinanceDepositError("Deposit is not confirmed yet.")
+    deposit_coin = str(deposit.get("coin", "")).upper()
+    if deposit_coin != "USDT":
+        raise BinanceDepositError(f"Deposit coin mismatch: expected USDT, got {deposit_coin}.")
+    deposit_amount = Decimal(str(deposit.get("amount", "0"))).quantize(Decimal("0.01"))
+    if deposit_amount != expected_amount:
+        raise BinanceDepositError(f"Deposit amount mismatch: found {deposit_amount}, expected {expected_amount}.")
+
+    with transaction.atomic():
+        payment = PaymentRequest.objects.select_for_update().select_related("user").get(pk=payment_id)
+        if payment.status != PaymentRequest.Status.PENDING:
+            raise BinanceDepositError("Only pending payment requests can be verified.")
+        if VerifiedDeposit.objects.select_for_update().filter(
+            provider=VerifiedDeposit.Provider.BINANCE,
+            txid=txid,
+        ).exists():
+            raise BinanceDepositError("This transaction ID was already used.")
+        user = TelegramUser.objects.select_for_update().get(pk=payment.user_id)
+        TelegramUser.objects.filter(pk=user.pk).update(balance=F("balance") + payment.amount)
+        payment.status = PaymentRequest.Status.APPROVED
+        payment.approved_at = timezone.now()
+        payment.admin_note = "Auto-approved by Binance pending payment verifier."
+        payment.save(update_fields=["status", "approved_at", "admin_note"])
+        WalletTransaction.objects.create(
+            user=user,
+            amount=payment.amount,
+            transaction_type=WalletTransaction.Type.TOPUP,
+            status=WalletTransaction.Status.COMPLETED,
+            related_payment=payment,
+            note=f"Auto-approved Binance deposit {txid}",
+        )
+        verified = VerifiedDeposit.objects.create(
+            user=user,
+            payment_request=payment,
+            provider=VerifiedDeposit.Provider.BINANCE,
+            txid=txid,
+            coin=deposit_coin,
+            network=str(deposit.get("network", "")),
+            amount=Decimal(str(deposit.get("amount", "0"))),
+            raw_payload=deposit,
+        )
+        create_referral_commission(payment)
+
+    send_telegram_message(
+        user.telegram_id,
+        f"✅ Your Binance top-up was verified.\nAmount credited: {payment.amount} USDT",
+    )
+    notify_admins(
+        "Binance top-up auto-approved\n\n"
+        f"Payment: #{payment.pk}\n"
+        f"User ID: {user.telegram_id}\n"
+        f"Credit amount: {payment.amount} USDT\n"
+        f"Paid amount: {deposit_amount} USDT\n"
+        f"TXID: {txid}"
+    )
+    return verified

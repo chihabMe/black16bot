@@ -246,7 +246,7 @@ async def create_topup_request(update, context, method: str):
     except (InvalidOperation, ValueError):
         await send_or_edit(
             update,
-            "Manual top-up selected.\n\nUse:\n/topup_amount 10 binance_pay transaction-id-or-note",
+            "Manual top-up selected.\n\nUse:\n/topup_amount 10 binance_deposit transaction-id-or-note",
             back_menu("topup"),
         )
         return
@@ -268,8 +268,8 @@ async def topup_amount(update, context):
 
     if len(context.args) < 2:
         await update.message.reply_text(
-            "Use:\n/topup_amount 10 binance_pay transaction-id-or-note\n\n"
-            "Methods: binance_pay, bybit_pay, usdt_bep20, usdt_trc20"
+            "Use:\n/topup_amount 10 binance_deposit transaction-id-or-note\n\n"
+            "Methods: binance_deposit, bybit_pay, usdt_bep20, usdt_trc20"
         )
         return
 
@@ -326,7 +326,7 @@ async def topup_photo_proof(update, context):
     parts = caption.split()
     if len(parts) < 3:
         await update.message.reply_text(
-            "Use the photo caption:\n/topup_amount 10 binance_pay transaction-id-or-note"
+            "Use the photo caption:\n/topup_amount 10 binance_deposit transaction-id-or-note"
         )
         return
     file_id = update.message.photo[-1].file_id if update.message.photo else ""
@@ -360,8 +360,11 @@ async def create_topup_from_parts(update, amount_text: str, method: str, proof: 
         return
 
     await update.message.reply_text(
-        f"Payment request #{payment.pk} created for {payment.amount} USDT.\n"
-        "An admin will approve it after checking your payment."
+        f"Payment request #{payment.pk} created.\n\n"
+        f"Credit amount: {payment.amount} USDT\n"
+        f"Send exactly: {payment.payable_amount or payment.amount} USDT\n"
+        f"Method: {payment.get_method_display()}\n\n"
+        "After payment, send the transaction ID/proof with the same command or upload a screenshot."
     )
 
 

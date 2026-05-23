@@ -22,6 +22,8 @@ class PaymentRequest(models.Model):
 
     user = models.ForeignKey("accounts.TelegramUser", related_name="payment_requests", on_delete=models.PROTECT)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
+    requested_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    payable_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, db_index=True)
     method = models.CharField(max_length=32, choices=Method.choices)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING, db_index=True)
     proof_text = models.TextField(blank=True)

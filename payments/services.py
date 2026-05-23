@@ -22,6 +22,21 @@ class PaymentRequestError(Exception):
     pass
 
 
+def unique_payable_amount(*, requested_amount: Decimal, method: str) -> Decimal:
+    base_amount = Decimal(str(requested_amount)).quantize(Decimal("0.01"))
+    if base_amount <= 0:
+        raise PaymentRequestError("Top-up amount must be greater than zero.")
+    for cents in range(1, 100):
+        candidate = base_amount + Decimal(cents) / Decimal("100")
+        if not PaymentRequest.objects.filter(
+            method=method,
+            status=PaymentRequest.Status.PENDING,
+            payable_amount=candidate,
+        ).exists():
+            return candidate.quantize(Decimal("0.01"))
+    raise PaymentRequestError("Could not assign a unique payable amount. Try again later.")
+
+
 def create_payment_request(
     *,
     user_id: int,
@@ -30,14 +45,18 @@ def create_payment_request(
     proof_text: str = "",
     proof_file_id: str = "",
 ) -> PaymentRequest:
-    if amount <= 0:
+    requested_amount = Decimal(str(amount)).quantize(Decimal("0.01"))
+    if requested_amount <= 0:
         raise PaymentRequestError("Top-up amount must be greater than zero.")
     if method not in ENABLED_PAYMENT_METHODS:
         raise PaymentRequestError("Unsupported payment method.")
+    payable_amount = unique_payable_amount(requested_amount=requested_amount, method=method)
 
     payment = PaymentRequest.objects.create(
         user_id=user_id,
-        amount=amount,
+        amount=requested_amount,
+        requested_amount=requested_amount,
+        payable_amount=payable_amount,
         method=method,
         proof_text=proof_text,
         proof_file_id=proof_file_id,
@@ -48,7 +67,8 @@ def create_payment_request(
         f"Payment: #{payment.pk}\n"
         f"User ID: {payment.user.telegram_id}\n"
         f"Username: @{payment.user.username or '-'}\n"
-        f"Amount: {payment.amount} USDT\n"
+        f"Credit amount: {payment.amount} USDT\n"
+        f"Payable amount: {payment.payable_amount} USDT\n"
         f"Method: {payment.get_method_display()}\n"
         f"Proof: {payment.proof_text[:500] or '-'}"
     )

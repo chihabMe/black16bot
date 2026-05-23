@@ -4,7 +4,7 @@ from unittest.mock import patch
 from django.test import TransactionTestCase, override_settings
 
 from accounts.models import ReferralLedger, TelegramUser
-from payments.binance import BinanceDepositError, verify_binance_deposit
+from payments.binance import BinanceDepositError, verify_binance_deposit, verify_pending_binance_payment
 from payments.models import PaymentRequest
 from payments.models import VerifiedDeposit
 from payments.services import (
@@ -88,8 +88,25 @@ class PaymentRequestServiceTests(TransactionTestCase):
             create_payment_request(
                 user_id=self.user.pk,
                 amount=Decimal("0.00"),
-                method=PaymentRequest.Method.BINANCE_PAY,
+                method=PaymentRequest.Method.BINANCE_DEPOSIT,
             )
+
+    def test_create_payment_request_assigns_unique_payable_amount(self):
+        first = create_payment_request(
+            user_id=self.user.pk,
+            amount=Decimal("10.00"),
+            method=PaymentRequest.Method.BINANCE_DEPOSIT,
+        )
+        second = create_payment_request(
+            user_id=self.user.pk,
+            amount=Decimal("10.00"),
+            method=PaymentRequest.Method.BINANCE_DEPOSIT,
+        )
+
+        self.assertEqual(first.amount, Decimal("10.00"))
+        self.assertEqual(first.requested_amount, Decimal("10.00"))
+        self.assertEqual(first.payable_amount, Decimal("10.01"))
+        self.assertEqual(second.payable_amount, Decimal("10.02"))
 
     def test_create_payment_request_rejects_unsupported_method(self):
         with self.assertRaises(PaymentRequestError):
@@ -140,6 +157,32 @@ class PaymentRequestServiceTests(TransactionTestCase):
                 txid="tx123",
                 network="BSC",
             )
+
+    @patch("payments.binance.notify_admins", return_value=1)
+    @patch("payments.binance.send_telegram_message", return_value=True)
+    @patch("payments.binance.fetch_binance_deposit_by_txid")
+    def test_verify_pending_binance_payment_credits_requested_amount(self, fetch_deposit, send_message, notify_admins):
+        payment = create_payment_request(
+            user_id=self.user.pk,
+            amount=Decimal("10.00"),
+            method=PaymentRequest.Method.BINANCE_DEPOSIT,
+            proof_text="tx456",
+        )
+        fetch_deposit.return_value = {
+            "txId": "tx456",
+            "coin": "USDT",
+            "network": "BSC",
+            "amount": str(payment.payable_amount),
+            "status": 1,
+        }
+
+        verified = verify_pending_binance_payment(payment_id=payment.pk)
+
+        self.user.refresh_from_db()
+        payment.refresh_from_db()
+        self.assertEqual(self.user.balance, Decimal("10.00"))
+        self.assertEqual(payment.status, PaymentRequest.Status.APPROVED)
+        self.assertEqual(verified.amount, payment.payable_amount)
 
     def test_expire_pending_payment_requests_marks_old_requests(self):
         from django.utils import timezone

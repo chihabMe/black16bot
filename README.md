@@ -81,32 +81,36 @@ Products support:
 For Telegram account marketplace entries, set product type to
 `Telegram account` in Django Admin and fill `country_code` / `country_name`.
 
-## Telegram Top-up MVP
+## Telegram Top-up
 
-The first version uses manual top-up review. A user can create a payment request
-with:
+Users can create a payment request with:
 
 ```txt
-/topup_amount 10 binance_pay transaction-id-or-note
+/topup_amount 10 binance_deposit transaction-id-or-note
 ```
 
 Users can also attach a screenshot/photo and use the same command as the photo
 caption:
 
 ```txt
-/topup_amount 10 binance_pay transaction-id-or-note
+/topup_amount 10 binance_deposit transaction-id-or-note
 ```
 
 Supported method codes:
 
 ```txt
-binance_pay
+binance_deposit
 bybit_pay
 usdt_bep20
 usdt_trc20
 ```
 
 Admin approval happens in Django Admin under `Payment requests`.
+
+Payment requests use a unique payable amount. If a user asks to top up
+`10.00 USDT`, the bot may ask them to send `10.01 USDT`. The wallet still
+credits the requested `10.00 USDT`; the unique payable amount is used to make
+payment matching safer.
 
 Users can view and cancel pending manual payment requests with:
 
@@ -119,8 +123,10 @@ Admins receive Telegram notifications for new top-up requests when
 
 ## Binance Automatic Top-up
 
-If `BINANCE_API_KEY` and `BINANCE_API_SECRET` are set, users can ask the bot to
-verify a Binance deposit transaction ID automatically:
+If `BINANCE_API_KEY` and `BINANCE_API_SECRET` are set, Binance top-ups can be
+verified automatically by transaction ID.
+
+For direct instant verification:
 
 ```txt
 /binance_topup 10 txid [network]
@@ -144,6 +150,19 @@ Rules:
 
 For safest operation, use a read-only Binance API key. Do not enable trading or
 withdrawals for this bot.
+
+For pending payment requests where the user submitted a Binance TXID as proof,
+run this periodically:
+
+```bash
+python3 manage.py verify_payments
+```
+
+This command checks pending Binance requests with proof text and auto-approves
+only when the Binance deposit is confirmed and exactly matches the payable
+amount. Bybit, USDT BEP-20, and USDT TRC-20 are currently structured for manual
+review plus exact payable amount matching; chain/API watchers can be added next
+without changing the user-facing top-up flow.
 
 Expired manual top-up requests can be cleared by cron or a scheduler with:
 
