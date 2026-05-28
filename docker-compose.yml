@@ -3,13 +3,13 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: black16bot
-      POSTGRES_USER: black16bot
-      POSTGRES_PASSWORD: black16bot
+      POSTGRES_DB: ${POSTGRES_DB:-black16bot}
+      POSTGRES_USER: ${POSTGRES_USER:-black16bot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-black16bot}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U black16bot -d black16bot"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-black16bot} -d ${POSTGRES_DB:-black16bot}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -23,12 +23,17 @@ services:
       && gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3"
     env_file: .env
     environment:
-      DATABASE_URL: postgres://black16bot:black16bot@db:5432/black16bot
+      DATABASE_URL: postgres://${POSTGRES_USER:-black16bot}:${POSTGRES_PASSWORD:-black16bot}@db:5432/${POSTGRES_DB:-black16bot}
     ports:
       - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "manage.py", "check"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   bot:
     build: .
@@ -36,10 +41,15 @@ services:
     command: python manage.py runbot
     env_file: .env
     environment:
-      DATABASE_URL: postgres://black16bot:black16bot@db:5432/black16bot
+      DATABASE_URL: postgres://${POSTGRES_USER:-black16bot}:${POSTGRES_PASSWORD:-black16bot}@db:5432/${POSTGRES_DB:-black16bot}
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "manage.py", "check"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   payment_verifier:
     build: .
@@ -53,10 +63,15 @@ services:
       done"
     env_file: .env
     environment:
-      DATABASE_URL: postgres://black16bot:black16bot@db:5432/black16bot
+      DATABASE_URL: postgres://${POSTGRES_USER:-black16bot}:${POSTGRES_PASSWORD:-black16bot}@db:5432/${POSTGRES_DB:-black16bot}
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "manage.py", "check"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
   postgres_data:
