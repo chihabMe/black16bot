@@ -5,8 +5,9 @@ from django.test import TransactionTestCase, override_settings
 from accounts.models import TelegramUser
 from catalog.models import Product, StockItem
 from orders.models import Order
-from orders.services import InsufficientBalance, OutOfStock, purchase_product, replace_order_stock
+from orders.services import InsufficientBalance, OutOfStock, purchase_product, refund_order, replace_order_stock
 from security.crypto import decrypt_text
+from wallet.models import WalletTransaction
 
 
 @override_settings(TELEGRAM_BOT_TOKEN="")
@@ -86,4 +87,40 @@ class PurchaseProductTests(TransactionTestCase):
         self.assertEqual(replacement.status, StockItem.Status.SOLD)
         self.assertEqual(decrypt_text(result.order.delivered_payload), "new")
 
-# Create your tests here.
+    def test_refund_order_credits_user_balance(self):
+        stock = StockItem.objects.create(product=self.product, secret_content="login:password")
+        result = purchase_product(user_id=self.user.pk, product_id=self.product.pk)
+
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.balance, Decimal("6.50"))
+
+        refund_order(order_id=result.order.pk)
+
+        self.user.refresh_from_db()
+        result.order.refresh_from_db()
+        stock.refresh_from_db()
+        self.assertEqual(self.user.balance, Decimal("10.00"))
+        self.assertEqual(result.order.status, Order.Status.REFUNDED)
+        self.assertEqual(stock.status, StockItem.Status.REFUNDED)
+
+        refund_tx = WalletTransaction.objects.filter(
+            user=self.user,
+            transaction_type=WalletTransaction.Type.REFUND,
+        ).first()
+        self.assertIsNotNone(refund_tx)
+        self.assertEqual(refund_tx.amount, Decimal("3.50"))
+
+    def test_refund_order_is_idempotent(self):
+        StockItem.objects.create(product=self.product, secret_content="login:password")
+        result = purchase_product(user_id=self.user.pk, product_id=self.product.pk)
+
+        refund_order(order_id=result.order.pk)
+        refund_order(order_id=result.order.pk)
+
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.balance, Decimal("10.00"))
+        refund_count = WalletTransaction.objects.filter(
+            user=self.user,
+            transaction_type=WalletTransaction.Type.REFUND,
+        ).count()
+        self.assertEqual(refund_count, 1)
