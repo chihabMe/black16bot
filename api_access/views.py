@@ -37,6 +37,7 @@ def api_error(api_key, request, endpoint: str, error_code: str, status: int):
     return JsonResponse({"error": error_code}, status=status)
 
 
+@csrf_exempt
 @require_GET
 def products(request):
     api_key, error = require_api_key(request)
