@@ -37,9 +37,10 @@ def send_broadcast(*, broadcast_id: int) -> Broadcast:
 
 
 def recover_stuck_broadcasts(minutes: int = 10) -> int:
+    """Reset broadcasts stuck in SENDING state for more than N minutes."""
     cutoff = timezone.now() - timedelta(minutes=minutes)
     count = Broadcast.objects.filter(
         status=Broadcast.Status.SENDING,
         created_at__lt=cutoff
-    ).update(status=Broadcast.Status.PENDING)
+    ).update(status=Broadcast.Status.DRAFT)
     return count
