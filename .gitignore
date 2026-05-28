@@ -11,3 +11,9 @@ video_frames/
 *.mp4
 .venv/
 venv/
+DEPLOYMENT_FIX_HANDOFF.md
+*.log
+.idea/
+.vscode/
+*.egg-info/
+docker-compose.override.yml
