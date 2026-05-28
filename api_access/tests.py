@@ -8,7 +8,7 @@ from api_access.models import DeveloperApiKey
 from catalog.models import Product, StockItem
 
 
-@override_settings(TELEGRAM_BOT_TOKEN="")
+@override_settings(TELEGRAM_BOT_TOKEN="", DEVELOPER_API_ENABLED=True)
 class DeveloperApiTests(TestCase):
     def setUp(self):
         self.user = TelegramUser.objects.create(telegram_id=3001, balance=Decimal("10.00"))
