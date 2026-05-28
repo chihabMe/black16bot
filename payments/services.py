@@ -75,6 +75,36 @@ def create_payment_request(
     return payment
 
 
+def submit_payment_proof(
+    *,
+    payment_id: int,
+    user_id: int,
+    proof_text: str = "",
+    proof_file_id: str = "",
+) -> PaymentRequest:
+    proof_text = proof_text.strip()
+    if not proof_text:
+        raise PaymentRequestError("Transaction ID is required.")
+
+    with transaction.atomic():
+        payment = PaymentRequest.objects.select_for_update().get(pk=payment_id, user_id=user_id)
+        if payment.status != PaymentRequest.Status.PENDING:
+            raise PaymentRequestError("Only pending payment requests can receive proof.")
+        payment.proof_text = proof_text or payment.proof_text
+        payment.save(update_fields=["proof_text"])
+
+    notify_admins(
+        "Top-up transaction ID submitted\n\n"
+        f"Payment: #{payment.pk}\n"
+        f"User ID: {payment.user.telegram_id}\n"
+        f"Credit amount: {payment.amount} USDT\n"
+        f"Payable amount: {payment.payable_amount} USDT\n"
+        f"Method: {payment.get_method_display()}\n"
+        f"TXID: {payment.proof_text[:500]}"
+    )
+    return payment
+
+
 def approve_payment_request(*, payment_id: int, admin_user=None, note: str = "") -> PaymentRequest:
     with transaction.atomic():
         payment = PaymentRequest.objects.select_for_update().select_related("user").get(pk=payment_id)

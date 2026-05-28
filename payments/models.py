@@ -52,6 +52,10 @@ class PaymentRequest(models.Model):
 class VerifiedDeposit(models.Model):
     class Provider(models.TextChoices):
         BINANCE = "binance", "Binance"
+        BINANCE_PAY = "binance_pay", "Binance Pay"
+        BSCSCAN = "bscscan", "BscScan"
+        MORALIS = "moralis", "Moralis"
+        TRONGRID = "trongrid", "TronGrid"
 
     user = models.ForeignKey("accounts.TelegramUser", related_name="verified_deposits", on_delete=models.PROTECT)
     payment_request = models.OneToOneField(

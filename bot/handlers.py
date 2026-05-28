@@ -29,7 +29,16 @@ from orders.models import Order
 from orders.services import InsufficientBalance, OutOfStock, ProductUnavailable, purchase_product
 from payments.models import PaymentRequest
 from payments.binance import BinanceDepositError, verify_binance_deposit
-from payments.services import PaymentApprovalError, PaymentRequestError, cancel_payment_request, create_payment_request
+from payments.chain import ChainDepositError
+from payments.instructions import payment_instruction_text
+from payments.services import (
+    PaymentApprovalError,
+    PaymentRequestError,
+    cancel_payment_request,
+    create_payment_request,
+    submit_payment_proof,
+)
+from payments.verification import verify_pending_payment
 from support.services import create_support_ticket
 from security.crypto import decrypt_text
 
@@ -239,16 +248,23 @@ async def show_topup(update, context):
 
 
 async def create_topup_request(update, context, method: str):
+    context.user_data["pending_topup_method"] = method
+    context.user_data.pop("pending_topup_proof_payment_id", None)
+    await send_or_edit(
+        update,
+        "Enter the amount in USDT for this top-up.\n\n"
+        "Example: 10\n\n"
+        "You will receive the exact payable amount and destination next.",
+        back_menu("topup"),
+    )
+
+
+async def receive_topup_amount(update, context, method: str, amount_text: str):
     user = await sync_to_async(get_user)(update)
-    amount_text = " ".join(context.args) if getattr(context, "args", None) else ""
     try:
         amount = Decimal(amount_text)
     except (InvalidOperation, ValueError):
-        await send_or_edit(
-            update,
-            "Manual top-up selected.\n\nUse:\n/topup_amount 10 binance_deposit transaction-id-or-note",
-            back_menu("topup"),
-        )
+        await update.message.reply_text("Amount must be a number, for example: 10")
         return
 
     def create_payment():
@@ -257,9 +273,12 @@ async def create_topup_request(update, context, method: str):
     try:
         payment = await sync_to_async(create_payment)()
     except PaymentRequestError as exc:
-        await send_or_edit(update, str(exc), back_menu("topup"))
+        await update.message.reply_text(str(exc))
         return
-    await send_or_edit(update, f"Payment request #{payment.pk} created. Admin will review it.", back_menu("home"))
+
+    context.user_data.pop("pending_topup_method", None)
+    context.user_data["pending_topup_proof_payment_id"] = payment.pk
+    await update.message.reply_text(payment_instruction_text(payment), parse_mode="HTML", reply_markup=back_menu("home"))
 
 
 async def topup_amount(update, context):
@@ -268,12 +287,25 @@ async def topup_amount(update, context):
 
     if len(context.args) < 2:
         await update.message.reply_text(
-            "Use:\n/topup_amount 10 binance_deposit transaction-id-or-note\n\n"
-            "Methods: binance_deposit, bybit_pay, usdt_bep20, usdt_trc20"
+            "Use:\n/topup_amount 10 binance_pay\n\n"
+            "Methods: binance_pay, binance_deposit, usdt_bep20, usdt_trc20"
         )
         return
 
     await create_topup_from_parts(update, context.args[0], context.args[1], " ".join(context.args[2:]).strip())
+
+
+async def topup_proof(update, context):
+    if len(context.args) < 2:
+        await update.message.reply_text("Use:\n/topup_proof payment_id transaction-id")
+        return
+    try:
+        payment_id = int(context.args[0])
+    except ValueError:
+        await update.message.reply_text("Payment ID must be a number.")
+        return
+    proof = " ".join(context.args[1:]).strip()
+    await attach_topup_proof(update, context, payment_id, proof_text=proof)
 
 
 async def binance_topup(update, context):
@@ -320,18 +352,75 @@ async def binance_topup(update, context):
 
 
 async def topup_photo_proof(update, context):
-    caption = update.message.caption or ""
-    if not caption.startswith("/topup_amount"):
+    await update.message.reply_text(
+        "Screenshots are not accepted for top-ups. Send the transaction ID instead."
+    )
+
+
+async def attach_topup_proof(update, context, payment_id: int, proof_text: str = "", proof_file_id: str = ""):
+    user = await sync_to_async(get_user)(update)
+
+    def submit():
+        return submit_payment_proof(
+            payment_id=payment_id,
+            user_id=user.pk,
+            proof_text=proof_text,
+            proof_file_id=proof_file_id,
+        )
+
+    try:
+        payment = await sync_to_async(submit)()
+    except (PaymentRequestError, PaymentRequest.DoesNotExist) as exc:
+        await update.message.reply_text(f"Could not submit transaction ID: {exc}")
         return
-    parts = caption.split()
-    if len(parts) < 3:
+
+    if context.user_data.get("pending_topup_proof_payment_id") == payment.pk:
+        context.user_data.pop("pending_topup_proof_payment_id", None)
+
+    def verify():
+        return verify_pending_payment(payment)
+
+    try:
+        verified = await sync_to_async(verify)()
+    except (BinanceDepositError, ChainDepositError) as exc:
         await update.message.reply_text(
-            "Use the photo caption:\n/topup_amount 10 binance_deposit transaction-id-or-note"
+            f"Transaction ID saved for payment request #{payment.pk}.\n"
+            f"Not verified yet: {exc}\n\n"
+            "If you made a mistake, resubmit the correct ID:\n"
+            f"/topup_proof {payment.pk} correct-id\n\n"
+            "The verifier will also retry automatically.",
+            reply_markup=back_menu("payments"),
         )
         return
-    file_id = update.message.photo[-1].file_id if update.message.photo else ""
-    proof = " ".join(parts[3:]).strip()
-    await create_topup_from_parts(update, parts[1], parts[2], proof, proof_file_id=file_id)
+
+    if verified:
+        await update.message.reply_text(
+            f"Payment request #{payment.pk} verified automatically.\n"
+            f"Amount credited: {payment.amount} USDT",
+            reply_markup=back_menu("home"),
+        )
+        return
+
+    await update.message.reply_text(
+        f"Transaction ID saved for payment request #{payment.pk}.\nThe verifier will retry automatically.",
+        reply_markup=back_menu("payments"),
+    )
+
+
+async def text_message(update, context):
+    method = context.user_data.get("pending_topup_method")
+    if method:
+        await receive_topup_amount(update, context, method, update.message.text.strip())
+        return
+
+    pending_payment_id = context.user_data.get("pending_topup_proof_payment_id")
+    if pending_payment_id:
+        await attach_topup_proof(update, context, pending_payment_id, proof_text=update.message.text.strip())
+        return
+
+    await update.message.reply_text(
+        "Use /start to open the menu, /topup to add funds, or /support_ticket message for support."
+    )
 
 
 async def create_topup_from_parts(update, amount_text: str, method: str, proof: str, proof_file_id: str = ""):
@@ -360,11 +449,8 @@ async def create_topup_from_parts(update, amount_text: str, method: str, proof: 
         return
 
     await update.message.reply_text(
-        f"Payment request #{payment.pk} created.\n\n"
-        f"Credit amount: {payment.amount} USDT\n"
-        f"Send exactly: {payment.payable_amount or payment.amount} USDT\n"
-        f"Method: {payment.get_method_display()}\n\n"
-        "After payment, send the transaction ID/proof with the same command or upload a screenshot."
+        payment_instruction_text(payment),
+        parse_mode="HTML",
     )
 
 
@@ -472,7 +558,8 @@ async def help_command(update, context):
         "/orders - order history\n"
         "/payments - pending top-ups\n"
         "/topup - top-up methods\n"
-        "/topup_amount 10 method proof - manual top-up request\n"
+        "/topup_amount 10 method - create top-up request\n"
+        "/topup_proof payment_id txid - submit transaction ID\n"
         "/binance_topup 10 txid [network] - auto Binance deposit check\n"
         "/notifications - product and stock alerts\n"
         "/support_ticket message - create support ticket\n"

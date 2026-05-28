@@ -41,9 +41,9 @@ class TopupMenuTests(TestCase):
         labels = [button.text for row in markup.inline_keyboard for button in row]
 
         self.assertIn("Binance", labels)
-        self.assertIn("Bybit", labels)
         self.assertIn("USDT BEP-20", labels)
         self.assertIn("USDT TRC-20", labels)
+        self.assertNotIn("Bybit", labels)
         self.assertNotIn("CryptoBot", labels)
         self.assertNotIn("TON", labels)
         self.assertNotIn("TRON", labels)

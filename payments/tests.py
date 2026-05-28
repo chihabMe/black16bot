@@ -5,6 +5,7 @@ from django.test import TransactionTestCase, override_settings
 
 from accounts.models import ReferralLedger, TelegramUser
 from payments.binance import BinanceDepositError, verify_binance_deposit, verify_pending_binance_payment
+from payments.chain import verify_pending_bep20_payment, verify_pending_trc20_payment
 from payments.models import PaymentRequest
 from payments.models import VerifiedDeposit
 from payments.services import (
@@ -14,6 +15,7 @@ from payments.services import (
     create_payment_request,
     expire_pending_payment_requests,
     reject_payment_request,
+    submit_payment_proof,
 )
 from wallet.models import WalletTransaction
 
@@ -124,6 +126,46 @@ class PaymentRequestServiceTests(TransactionTestCase):
                 method=PaymentRequest.Method.CRYPTOBOT,
             )
 
+    def test_create_payment_request_rejects_disabled_bybit_method(self):
+        with self.assertRaises(PaymentRequestError):
+            create_payment_request(
+                user_id=self.user.pk,
+                amount=Decimal("10.00"),
+                method=PaymentRequest.Method.BYBIT_PAY,
+            )
+
+    def test_submit_payment_proof_updates_pending_request(self):
+        payment = create_payment_request(
+            user_id=self.user.pk,
+            amount=Decimal("10.00"),
+            method=PaymentRequest.Method.BINANCE_DEPOSIT,
+        )
+
+        submit_payment_proof(
+            payment_id=payment.pk,
+            user_id=self.user.pk,
+            proof_text="0xabc123",
+        )
+
+        payment.refresh_from_db()
+        self.assertEqual(payment.proof_text, "0xabc123")
+        self.assertEqual(payment.status, PaymentRequest.Status.PENDING)
+
+    def test_submit_payment_proof_rejects_non_pending_request(self):
+        payment = PaymentRequest.objects.create(
+            user=self.user,
+            amount=Decimal("10.00"),
+            method=PaymentRequest.Method.BINANCE_DEPOSIT,
+            status=PaymentRequest.Status.APPROVED,
+        )
+
+        with self.assertRaises(PaymentRequestError):
+            submit_payment_proof(
+                payment_id=payment.pk,
+                user_id=self.user.pk,
+                proof_text="0xabc123",
+            )
+
     @patch("payments.binance.notify_admins", return_value=1)
     @patch("payments.binance.send_telegram_message", return_value=True)
     @patch("payments.binance.fetch_binance_deposit_by_txid")
@@ -183,6 +225,85 @@ class PaymentRequestServiceTests(TransactionTestCase):
         self.assertEqual(self.user.balance, Decimal("10.00"))
         self.assertEqual(payment.status, PaymentRequest.Status.APPROVED)
         self.assertEqual(verified.amount, payment.payable_amount)
+
+    @override_settings(
+        BSC_CHAIN_ID="56",
+        USDT_BEP20_WALLET_ADDRESS="0x1111111111111111111111111111111111111111",
+        BSC_USDT_CONTRACT_ADDRESS="0x55d398326f99059ff775485246999027b3197955",
+        BSC_MIN_CONFIRMATIONS=15,
+        MORALIS_API_KEY="test-key",
+    )
+    @patch("payments.chain.notify_admins", return_value=1)
+    @patch("payments.chain.send_telegram_message", return_value=True)
+    @patch("payments.chain.get_json")
+    def test_verify_pending_bep20_payment_credits_requested_amount(self, get_json, send_message, notify_admins):
+        payment = PaymentRequest.objects.create(
+            user=self.user,
+            amount=Decimal("10.00"),
+            requested_amount=Decimal("10.00"),
+            payable_amount=Decimal("10.01"),
+            method=PaymentRequest.Method.USDT_BEP20,
+            proof_text="0xbep20tx",
+        )
+        get_json.return_value = {
+            "result": [
+                {
+                    "transaction_hash": "0xbep20tx",
+                    "to_address": "0x1111111111111111111111111111111111111111",
+                    "address": "0x55d398326f99059ff775485246999027b3197955",
+                    "value_decimal": "10.01",
+                    "token_symbol": "USDT",
+                }
+            ],
+        }
+
+        verified = verify_pending_bep20_payment(payment_id=payment.pk)
+
+        self.user.refresh_from_db()
+        payment.refresh_from_db()
+        self.assertEqual(self.user.balance, Decimal("10.00"))
+        self.assertEqual(payment.status, PaymentRequest.Status.APPROVED)
+        self.assertEqual(verified.amount, payment.payable_amount)
+        self.assertEqual(verified.provider, VerifiedDeposit.Provider.MORALIS)
+
+    @override_settings(
+        USDT_TRC20_WALLET_ADDRESS="TRecipientAddress",
+        TRON_USDT_CONTRACT_ADDRESS="TXLAQ63Xg1NAzckPwKHvzw7CSEmLMEqcdj",
+    )
+    @patch("payments.chain.notify_admins", return_value=1)
+    @patch("payments.chain.send_telegram_message", return_value=True)
+    @patch("payments.chain.get_json")
+    def test_verify_pending_trc20_payment_credits_requested_amount(self, get_json, send_message, notify_admins):
+        payment = PaymentRequest.objects.create(
+            user=self.user,
+            amount=Decimal("10.00"),
+            requested_amount=Decimal("10.00"),
+            payable_amount=Decimal("10.01"),
+            method=PaymentRequest.Method.USDT_TRC20,
+            proof_text="trc20tx",
+        )
+        get_json.return_value = {
+            "data": [
+                {
+                    "transaction_id": "trc20tx",
+                    "to": "TRecipientAddress",
+                    "value": "10010000",
+                    "token_info": {
+                        "address": "TXLAQ63Xg1NAzckPwKHvzw7CSEmLMEqcdj",
+                        "decimals": 6,
+                    },
+                }
+            ],
+        }
+
+        verified = verify_pending_trc20_payment(payment_id=payment.pk)
+
+        self.user.refresh_from_db()
+        payment.refresh_from_db()
+        self.assertEqual(self.user.balance, Decimal("10.00"))
+        self.assertEqual(payment.status, PaymentRequest.Status.APPROVED)
+        self.assertEqual(verified.amount, payment.payable_amount)
+        self.assertEqual(verified.provider, VerifiedDeposit.Provider.TRONGRID)
 
     def test_expire_pending_payment_requests_marks_old_requests(self):
         from django.utils import timezone

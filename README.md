@@ -86,33 +86,32 @@ For Telegram account marketplace entries, set product type to
 Users can create a payment request with:
 
 ```txt
-/topup_amount 10 binance_deposit transaction-id-or-note
+/topup_amount 10 binance_deposit
 ```
 
-Users can also attach a screenshot/photo and use the same command as the photo
-caption:
+After sending the exact payable amount, users submit the transaction ID with:
 
 ```txt
-/topup_amount 10 binance_deposit transaction-id-or-note
+/topup_proof payment-id transaction-id
 ```
 
 Supported method codes:
 
 ```txt
 binance_deposit
-bybit_pay
 usdt_bep20
 usdt_trc20
 ```
 
-Admin approval happens in Django Admin under `Payment requests`.
+Screenshots are not accepted for top-ups. Active methods must be verifiable by
+transaction ID.
 
 Payment requests use a unique payable amount. If a user asks to top up
 `10.00 USDT`, the bot may ask them to send `10.01 USDT`. The wallet still
 credits the requested `10.00 USDT`; the unique payable amount is used to make
 payment matching safer.
 
-Users can view and cancel pending manual payment requests with:
+Users can view and cancel pending payment requests with:
 
 ```txt
 /payments
@@ -121,7 +120,7 @@ Users can view and cancel pending manual payment requests with:
 Admins receive Telegram notifications for new top-up requests when
 `TELEGRAM_ADMIN_IDS` or `ADMIN_NOTIFICATION_CHAT_ID` is configured.
 
-## Binance Automatic Top-up
+## Automatic Top-up Verification
 
 If `BINANCE_API_KEY` and `BINANCE_API_SECRET` are set, Binance top-ups can be
 verified automatically by transaction ID.
@@ -151,20 +150,36 @@ Rules:
 For safest operation, use a read-only Binance API key. Do not enable trading or
 withdrawals for this bot.
 
-For pending payment requests where the user submitted a Binance TXID as proof,
-run this periodically:
+For BEP-20 verification, configure:
+
+```env
+USDT_BEP20_WALLET_ADDRESS=
+BSCSCAN_API_KEY=
+BSC_USDT_CONTRACT_ADDRESS=0x55d398326f99059ff775485246999027b3197955
+BSC_MIN_CONFIRMATIONS=15
+```
+
+For TRC-20 verification, configure:
+
+```env
+USDT_TRC20_WALLET_ADDRESS=
+TRONGRID_API_KEY=
+TRON_USDT_CONTRACT_ADDRESS=TXLAQ63Xg1NAzckPwKHvzw7CSEmLMEqcdj
+```
+
+For pending payment requests where the user submitted a TXID, run this
+periodically:
 
 ```bash
 python3 manage.py verify_payments
 ```
 
-This command checks pending Binance requests with proof text and auto-approves
-only when the Binance deposit is confirmed and exactly matches the payable
-amount. Bybit, USDT BEP-20, and USDT TRC-20 are currently structured for manual
-review plus exact payable amount matching; chain/API watchers can be added next
-without changing the user-facing top-up flow.
+This command checks pending Binance, BEP-20, and TRC-20 requests and
+auto-approves only when the transaction is confirmed, sent to the configured
+wallet, uses USDT, has not been used before, and exactly matches the payable
+amount.
 
-Expired manual top-up requests can be cleared by cron or a scheduler with:
+Expired top-up requests can be cleared by cron or a scheduler with:
 
 ```bash
 python3 manage.py expire_payments
