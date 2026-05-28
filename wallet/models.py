@@ -44,6 +44,9 @@ class WalletTransaction(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+        ]
 
     def __str__(self) -> str:
         return f"{self.user} {self.amount} {self.transaction_type}"

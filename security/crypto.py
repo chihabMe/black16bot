@@ -8,6 +8,10 @@ from django.conf import settings
 PREFIX = "enc:v1:"
 
 
+class DecryptionError(Exception):
+    pass
+
+
 def _fernet() -> Fernet:
     key_material = settings.STOCK_ENCRYPTION_KEY or settings.SECRET_KEY
     digest = hashlib.sha256(key_material.encode()).digest()
@@ -33,4 +37,4 @@ def decrypt_text(value: str) -> str:
     try:
         return _fernet().decrypt(token).decode()
     except InvalidToken:
-        return "[encrypted value could not be decrypted]"
+        raise DecryptionError("Failed to decrypt value (possible key mismatch)")

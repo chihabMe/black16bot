@@ -27,6 +27,10 @@ class Order(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+            models.Index(fields=['user', 'status']),
+        ]
 
     def __str__(self) -> str:
         return f"Order #{self.pk} - {self.user}"

@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.db import transaction
 from django.utils import timezone
 
@@ -32,3 +34,12 @@ def send_broadcast(*, broadcast_id: int) -> Broadcast:
     broadcast.status = Broadcast.Status.SENT if failed == 0 else Broadcast.Status.FAILED
     broadcast.save(update_fields=["sent_count", "failed_count", "sent_at", "status"])
     return broadcast
+
+
+def recover_stuck_broadcasts(minutes: int = 10) -> int:
+    cutoff = timezone.now() - timedelta(minutes=minutes)
+    count = Broadcast.objects.filter(
+        status=Broadcast.Status.SENDING,
+        created_at__lt=cutoff
+    ).update(status=Broadcast.Status.PENDING)
+    return count

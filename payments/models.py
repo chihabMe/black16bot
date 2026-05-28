@@ -44,6 +44,10 @@ class PaymentRequest(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=['expires_at']),
+            models.Index(fields=['user', 'status']),
+        ]
 
     def __str__(self) -> str:
         return f"{self.user} {self.amount} {self.method} ({self.status})"

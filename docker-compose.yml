@@ -59,6 +59,7 @@ services:
       while true; do
       python manage.py verify_payments --limit 100;
       python manage.py expire_payments;
+      python manage.py recover_broadcasts;
       sleep 60;
       done"
     env_file: .env

@@ -26,6 +26,10 @@ class TelegramUser(models.Model):
 
     class Meta:
         ordering = ["-joined_at"]
+        indexes = [
+            models.Index(fields=['is_blocked']),
+            models.Index(fields=['notifications_enabled']),
+        ]
 
     def __str__(self) -> str:
         label = self.username or self.first_name or str(self.telegram_id)
@@ -73,6 +77,9 @@ class ReferralLedger(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=['referrer', 'status']),
+        ]
 
     def __str__(self) -> str:
         return f"{self.referrer} earned {self.commission_amount} from {self.referee}"

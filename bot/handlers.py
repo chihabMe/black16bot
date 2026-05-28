@@ -40,7 +40,7 @@ from payments.services import (
 )
 from payments.verification import verify_pending_payment
 from support.services import create_support_ticket
-from security.crypto import decrypt_text
+from security.crypto import decrypt_text, DecryptionError
 
 
 PAGE_SIZE = 8
@@ -173,12 +173,25 @@ async def buy_product(update, context, product_id: int, quantity: int = 1):
         await send_or_edit(update, "This product is out of stock.", back_menu("shop"))
         return
 
+    try:
+        decrypted_payload = decrypt_text(result.order.delivered_payload)
+    except DecryptionError as e:
+        import logging
+        logging.getLogger(__name__).error(f"Decryption failed for order {result.order.pk}: {e}")
+        decrypted_payload = "[Contact support to receive your item]"
+        from bot.telegram_client import notify_admins
+        notify_admins(
+            f"🚨 Decryption failed for order #{result.order.pk}\n"
+            f"User: {user.telegram_id}\n"
+            f"Error: {e}"
+        )
+
     text = (
         f"✅ Order #{result.order.pk} completed\n\n"
         f"🛍️ Product: {result.order.product.name}\n"
         f"📦 Quantity: {result.order.quantity}\n"
         f"💵 Total: {result.order.price_paid} USDT\n\n"
-        f"🔐 Your item(s):\n{decrypt_text(result.order.delivered_payload)}"
+        f"🔐 Your item(s):\n{decrypted_payload}"
     )
     await send_or_edit(update, text, back_menu("orders"))
 
@@ -225,6 +238,22 @@ async def show_order_detail(update, context, order_id: int):
         await send_or_edit(update, "Order not found.", back_menu("orders"))
         return
 
+    try:
+        if order.delivered_payload:
+            decrypted_item = decrypt_text(order.delivered_payload)
+        else:
+            decrypted_item = decrypt_text(order.stock_item.secret_content)
+    except DecryptionError as e:
+        import logging
+        logging.getLogger(__name__).error(f"Decryption failed for order {order.pk}: {e}")
+        decrypted_item = "[Contact support to receive your item]"
+        from bot.telegram_client import notify_admins
+        notify_admins(
+            f"🚨 Decryption failed for order #{order.pk}\n"
+            f"User: {user.telegram_id}\n"
+            f"Error: {e}"
+        )
+
     text = (
         f"📦 Order #{order.pk}\n\n"
         f"🛍️ Product: {order.product.name}\n"
@@ -232,7 +261,7 @@ async def show_order_detail(update, context, order_id: int):
         f"📦 Quantity: {order.quantity}\n"
         f"Status: {order.status}\n"
         f"Created: {order.created_at:%Y-%m-%d %H:%M}\n\n"
-        f"🔐 Delivered item:\n{decrypt_text(order.delivered_payload) if order.delivered_payload else decrypt_text(order.stock_item.secret_content)}"
+        f"🔐 Delivered item:\n{decrypted_item}"
     )
     await send_or_edit(update, text, back_menu("orders"))
 
