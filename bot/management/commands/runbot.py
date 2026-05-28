@@ -60,6 +60,7 @@ class Command(BaseCommand):
         application.add_handler(MessageHandler(filters.PHOTO, handlers.topup_photo_proof))
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handlers.text_message))
         application.add_handler(CallbackQueryHandler(handlers.callback_router))
+        application.add_error_handler(handlers.error_handler)
 
         self.stdout.write(self.style.SUCCESS("Telegram bot polling started."))
         application.run_polling()

@@ -1,6 +1,7 @@
 services:
   db:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: black16bot
       POSTGRES_USER: black16bot
@@ -15,6 +16,7 @@ services:
 
   web:
     build: .
+    restart: unless-stopped
     command: >
       sh -c "python manage.py migrate --noinput
       && python manage.py collectstatic --noinput
@@ -30,6 +32,7 @@ services:
 
   bot:
     build: .
+    restart: unless-stopped
     command: python manage.py runbot
     env_file: .env
     environment:
@@ -40,6 +43,7 @@ services:
 
   payment_verifier:
     build: .
+    restart: unless-stopped
     command: >
       sh -c "python manage.py migrate --noinput;
       while true; do

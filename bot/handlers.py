@@ -46,6 +46,29 @@ from security.crypto import decrypt_text
 PAGE_SIZE = 8
 
 
+async def error_handler(update, context):
+    import logging
+    import traceback
+    logger = logging.getLogger(__name__)
+    
+    error = context.error
+    logger.error(f"Unhandled exception: {error}", exc_info=error)
+    
+    try:
+        if update and update.effective_message:
+            await update.effective_message.reply_text(
+                "⚠️ An error occurred. Please try again or contact support."
+            )
+    except Exception:
+        pass
+    
+    error_str = str(error).lower()
+    if any(keyword in error_str for keyword in ['database', 'payment', 'decrypt', 'balance']):
+        from bot.telegram_client import notify_admins
+        tb = ''.join(traceback.format_exception(type(error), error, error.__traceback__))
+        notify_admins(f"🚨 Critical bot error:\n\n{str(error)}\n\n{tb[:500]}")
+
+
 def get_user(update) -> TelegramUser:
     return upsert_telegram_user(update.effective_user, settings.DEFAULT_BOT_LANGUAGE)
 
@@ -679,55 +702,60 @@ async def callback_router(update, context):
     await query.answer()
     data = query.data or ""
 
-    if data == "home":
-        await start(update, context)
-    elif data == "shop":
-        await show_shop(update, context)
-    elif data == "telegram_accounts":
-        await show_telegram_accounts(update, context)
-    elif data.startswith("shop:"):
-        await show_shop(update, context, int(data.split(":", 1)[1]))
-    elif data.startswith("product:"):
-        await show_product(update, context, int(data.split(":", 1)[1]))
-    elif data.startswith("buy:"):
-        _, product_id, quantity = data.split(":")
-        await buy_product(update, context, int(product_id), int(quantity))
-    elif data.startswith("note:"):
-        await show_product_note(update, context, int(data.split(":", 1)[1]))
-    elif data.startswith("share:"):
-        await share_product(update, context, int(data.split(":", 1)[1]))
-    elif data == "profile":
-        await show_profile(update, context)
-    elif data == "orders":
-        await show_orders(update, context)
-    elif data.startswith("order:"):
-        await show_order_detail(update, context, int(data.split(":", 1)[1]))
-    elif data == "topup":
-        await show_topup(update, context)
-    elif data == "payments":
-        await show_payments(update, context)
-    elif data.startswith("pay_cancel:"):
-        await cancel_payment(update, context, int(data.split(":", 1)[1]))
-    elif data.startswith("topup_method:"):
-        await create_topup_request(update, context, data.split(":", 1)[1])
-    elif data == "language":
-        await show_language(update, context)
-    elif data == "notifications":
-        await show_notifications(update, context)
-    elif data == "notifications_toggle":
-        await toggle_notifications(update, context)
-    elif data.startswith("lang:"):
-        await set_language(update, context, data.split(":", 1)[1])
-    elif data == "support":
-        await show_support(update, context)
-    elif data == "earn":
-        await show_referral(update, context)
-    elif data == "api":
-        await show_api(update, context)
-    elif data == "api_create":
-        await create_api_key(update, context)
-    elif data == "api_revoke":
-        await revoke_api_key(update, context)
+    try:
+        if data == "home":
+            await start(update, context)
+        elif data == "shop":
+            await show_shop(update, context)
+        elif data == "telegram_accounts":
+            await show_telegram_accounts(update, context)
+        elif data.startswith("shop:"):
+            await show_shop(update, context, int(data.split(":", 1)[1]))
+        elif data.startswith("product:"):
+            await show_product(update, context, int(data.split(":", 1)[1]))
+        elif data.startswith("buy:"):
+            _, product_id, quantity = data.split(":")
+            await buy_product(update, context, int(product_id), int(quantity))
+        elif data.startswith("note:"):
+            await show_product_note(update, context, int(data.split(":", 1)[1]))
+        elif data.startswith("share:"):
+            await share_product(update, context, int(data.split(":", 1)[1]))
+        elif data == "profile":
+            await show_profile(update, context)
+        elif data == "orders":
+            await show_orders(update, context)
+        elif data.startswith("order:"):
+            await show_order_detail(update, context, int(data.split(":", 1)[1]))
+        elif data == "topup":
+            await show_topup(update, context)
+        elif data == "payments":
+            await show_payments(update, context)
+        elif data.startswith("pay_cancel:"):
+            await cancel_payment(update, context, int(data.split(":", 1)[1]))
+        elif data.startswith("topup_method:"):
+            await create_topup_request(update, context, data.split(":", 1)[1])
+        elif data == "language":
+            await show_language(update, context)
+        elif data == "notifications":
+            await show_notifications(update, context)
+        elif data == "notifications_toggle":
+            await toggle_notifications(update, context)
+        elif data.startswith("lang:"):
+            await set_language(update, context, data.split(":", 1)[1])
+        elif data == "support":
+            await show_support(update, context)
+        elif data == "earn":
+            await show_referral(update, context)
+        elif data == "api":
+            await show_api(update, context)
+        elif data == "api_create":
+            await create_api_key(update, context)
+        elif data == "api_revoke":
+            await revoke_api_key(update, context)
+    except ValueError:
+        import logging
+        logging.getLogger(__name__).warning(f"Malformed callback data: {data}")
+        await query.answer("Invalid request. Please try again.", show_alert=True)
 
 
 async def send_or_edit(update, text: str, reply_markup=None):
