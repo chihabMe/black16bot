@@ -41,9 +41,9 @@ class TopupMenuTests(TestCase):
         labels = [button.text for row in markup.inline_keyboard for button in row]
 
         self.assertIn("Binance Pay", labels)
-        self.assertIn("Binance Deposit", labels)
         self.assertIn("USDT BEP-20", labels)
         self.assertIn("USDT TRC-20", labels)
+        self.assertNotIn("Binance Deposit", labels)
         self.assertNotIn("Bybit", labels)
         self.assertNotIn("CryptoBot", labels)
         self.assertNotIn("TON", labels)
@@ -52,4 +52,4 @@ class TopupMenuTests(TestCase):
 
         callbacks = [button.callback_data for row in markup.inline_keyboard for button in row]
         self.assertIn("topup_method:binance_pay", callbacks)
-        self.assertIn("topup_method:binance_deposit", callbacks)
+        self.assertNotIn("topup_method:binance_deposit", callbacks)
