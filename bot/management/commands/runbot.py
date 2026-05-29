@@ -17,7 +17,6 @@ async def configure_bot_menu(application):
             BotCommand("profile", "View your profile"),
             BotCommand("referral", "Open referral dashboard"),
             BotCommand("support", "Contact support"),
-            BotCommand("language", "Change language"),
             BotCommand("help", "Show help"),
         ]
     )
@@ -50,7 +49,6 @@ class Command(BaseCommand):
         application.add_handler(CommandHandler("binance_topup", handlers.binance_topup))
         application.add_handler(CommandHandler("referral", handlers.show_referral))
         application.add_handler(CommandHandler("notifications", handlers.show_notifications))
-        application.add_handler(CommandHandler("language", handlers.show_language))
         application.add_handler(CommandHandler("support", handlers.show_support))
         application.add_handler(CommandHandler("support_ticket", handlers.support_ticket))
         application.add_handler(CommandHandler("api", handlers.show_api))

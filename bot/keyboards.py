@@ -16,7 +16,6 @@ def main_menu():
         ],
         [
             InlineKeyboardButton("🔔 Notifications", callback_data="notifications"),
-            InlineKeyboardButton("🌐 Language", callback_data="language"),
         ],
     ]
     if settings.DEVELOPER_API_ENABLED:
@@ -114,28 +113,6 @@ def notifications_menu(enabled: bool):
             [InlineKeyboardButton("⬅️ Back", callback_data="home")],
         ]
     )
-
-
-def language_menu():
-    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-
-    rows = [
-        [
-            InlineKeyboardButton("English", callback_data="lang:en"),
-            InlineKeyboardButton("Tiếng Việt", callback_data="lang:vi"),
-        ],
-        [
-            InlineKeyboardButton("中文", callback_data="lang:zh"),
-            InlineKeyboardButton("Indonesia", callback_data="lang:id"),
-        ],
-        [
-            InlineKeyboardButton("Español", callback_data="lang:es"),
-            InlineKeyboardButton("Русский", callback_data="lang:ru"),
-        ],
-        [InlineKeyboardButton("العربية", callback_data="lang:ar")],
-        [InlineKeyboardButton("Back", callback_data="home")],
-    ]
-    return InlineKeyboardMarkup(rows)
 
 
 def api_menu(has_key: bool):

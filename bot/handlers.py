@@ -14,7 +14,6 @@ from api_access.webhooks import UnsafeWebhookUrl, validate_webhook_url
 from bot.keyboards import (
     back_menu,
     api_menu,
-    language_menu,
     main_menu,
     notifications_menu,
     orders_menu,
@@ -204,7 +203,6 @@ async def show_profile(update, context):
         f"Username: @{user.username or '-'}\n"
         f"Balance: {user.balance} USDT\n"
         f"Notifications: {'on' if user.notifications_enabled else 'off'}\n"
-        f"Language: {user.language}\n"
         f"Joined: {user.joined_at:%Y-%m-%d}"
     )
     await send_or_edit(update, text, back_menu("home"))
@@ -529,17 +527,6 @@ async def admin_stats(update, context):
     )
 
 
-async def show_language(update, context):
-    await send_or_edit(update, "🌐 Please select your language:", language_menu())
-
-
-async def set_language(update, context, language: str):
-    user = await sync_to_async(get_user)(update)
-    user.language = language
-    await sync_to_async(user.save)(update_fields=["language"])
-    await send_or_edit(update, "Language updated.", back_menu("home"))
-
-
 async def show_notifications(update, context):
     user = await sync_to_async(get_user)(update)
     status = "on" if user.notifications_enabled else "off"
@@ -614,8 +601,7 @@ async def help_command(update, context):
         "/topup_proof payment_id txid - submit transaction ID\n"
         "/binance_topup 10 txid [network] - auto Binance deposit check\n"
         "/notifications - product and stock alerts\n"
-        "/support_ticket message - create support ticket\n"
-        "/language - change language"
+        "/support_ticket message - create support ticket"
     )
 
 
@@ -763,14 +749,10 @@ async def callback_router(update, context):
             await cancel_payment(update, context, int(data.split(":", 1)[1]))
         elif data.startswith("topup_method:"):
             await create_topup_request(update, context, data.split(":", 1)[1])
-        elif data == "language":
-            await show_language(update, context)
         elif data == "notifications":
             await show_notifications(update, context)
         elif data == "notifications_toggle":
             await toggle_notifications(update, context)
-        elif data.startswith("lang:"):
-            await set_language(update, context, data.split(":", 1)[1])
         elif data == "support":
             await show_support(update, context)
         elif data == "earn":
