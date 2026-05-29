@@ -90,19 +90,19 @@ class PaymentRequestServiceTests(TransactionTestCase):
             create_payment_request(
                 user_id=self.user.pk,
                 amount=Decimal("0.00"),
-                method=PaymentRequest.Method.BINANCE_DEPOSIT,
+                method=PaymentRequest.Method.BINANCE_PAY,
             )
 
     def test_create_payment_request_assigns_unique_payable_amount(self):
         first = create_payment_request(
             user_id=self.user.pk,
             amount=Decimal("10.00"),
-            method=PaymentRequest.Method.BINANCE_DEPOSIT,
+            method=PaymentRequest.Method.BINANCE_PAY,
         )
         second = create_payment_request(
             user_id=self.user.pk,
             amount=Decimal("10.00"),
-            method=PaymentRequest.Method.BINANCE_DEPOSIT,
+            method=PaymentRequest.Method.BINANCE_PAY,
         )
 
         self.assertEqual(first.amount, Decimal("10.00"))
@@ -138,7 +138,7 @@ class PaymentRequestServiceTests(TransactionTestCase):
         payment = create_payment_request(
             user_id=self.user.pk,
             amount=Decimal("10.00"),
-            method=PaymentRequest.Method.BINANCE_DEPOSIT,
+            method=PaymentRequest.Method.BINANCE_PAY,
         )
 
         submit_payment_proof(
@@ -155,7 +155,7 @@ class PaymentRequestServiceTests(TransactionTestCase):
         payment = PaymentRequest.objects.create(
             user=self.user,
             amount=Decimal("10.00"),
-            method=PaymentRequest.Method.BINANCE_DEPOSIT,
+            method=PaymentRequest.Method.BINANCE_PAY,
             status=PaymentRequest.Status.APPROVED,
         )
 
