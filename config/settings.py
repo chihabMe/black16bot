@@ -72,6 +72,7 @@ INSTALLED_APPS = [
     'api_access',
     'audit',
     'bot',
+    'analytics',
 ]
 
 MIDDLEWARE = [
