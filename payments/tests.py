@@ -204,9 +204,13 @@ class PaymentRequestServiceTests(TransactionTestCase):
     @patch("payments.binance.send_telegram_message", return_value=True)
     @patch("payments.binance.fetch_binance_deposit_by_txid")
     def test_verify_pending_binance_payment_credits_requested_amount(self, fetch_deposit, send_message, notify_admins):
-        payment = create_payment_request(
-            user_id=self.user.pk,
+        # Create payment directly since BINANCE_DEPOSIT is no longer in enabled methods
+        # This tests backward compatibility for existing pending payments
+        payment = PaymentRequest.objects.create(
+            user=self.user,
             amount=Decimal("10.00"),
+            requested_amount=Decimal("10.00"),
+            payable_amount=Decimal("10.01"),
             method=PaymentRequest.Method.BINANCE_DEPOSIT,
             proof_text="tx456",
         )
