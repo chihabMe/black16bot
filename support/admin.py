@@ -10,5 +10,6 @@ class SupportTicketAdmin(admin.ModelAdmin):
     search_fields = ("user__telegram_id", "user__username", "message", "admin_note")
     readonly_fields = ("created_at", "closed_at")
     autocomplete_fields = ("user",)
+    list_select_related = ("user",)
 
 # Register your models here.

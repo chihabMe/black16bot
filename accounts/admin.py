@@ -43,6 +43,7 @@ class ReferralLedgerAdmin(admin.ModelAdmin):
     search_fields = ("referrer__telegram_id", "referee__telegram_id", "referrer__username", "referee__username")
     autocomplete_fields = ("referrer", "referee", "source_payment")
     readonly_fields = ("created_at", "processed_by", "processed_at")
+    list_select_related = ("referrer", "referee", "source_payment", "processed_by")
     actions = ("transfer_selected_referrers_to_wallet", "mark_selected_withdrawn", "reverse_selected")
 
     @admin.action(description="Transfer available commissions for selected referrers to wallet")

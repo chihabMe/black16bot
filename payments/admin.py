@@ -12,6 +12,7 @@ class PaymentRequestAdmin(admin.ModelAdmin):
     search_fields = ("user__telegram_id", "user__username", "proof_text", "admin_note")
     readonly_fields = ("created_at", "approved_at", "rejected_at")
     autocomplete_fields = ("user", "approved_by")
+    list_select_related = ("user", "approved_by")
     actions = ("approve_selected", "reject_selected")
 
     def formfield_for_choice_field(self, db_field, request, **kwargs):
@@ -57,5 +58,6 @@ class VerifiedDepositAdmin(admin.ModelAdmin):
     search_fields = ("txid", "user__telegram_id", "user__username")
     readonly_fields = ("credited_at", "raw_payload")
     autocomplete_fields = ("user", "payment_request")
+    list_select_related = ("user", "payment_request")
 
 # Register your models here.

@@ -10,5 +10,6 @@ class WalletTransactionAdmin(admin.ModelAdmin):
     search_fields = ("user__telegram_id", "user__username", "note")
     readonly_fields = ("created_at",)
     autocomplete_fields = ("user", "related_order", "related_payment", "created_by")
+    list_select_related = ("user", "related_order", "related_payment", "created_by")
 
 # Register your models here.

@@ -135,6 +135,7 @@ class StockItemAdmin(admin.ModelAdmin):
     search_fields = ("product__name", "sold_to__telegram_id", "sold_to__username", "secret_content")
     readonly_fields = ("created_at", "reserved_at", "sold_at", "secret_warning")
     autocomplete_fields = ("product", "sold_to", "added_by")
+    list_select_related = ("product", "sold_to")
     actions = ("disable_stock", "mark_available")
 
     @admin.display(description="Secret")
