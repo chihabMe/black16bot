@@ -6,18 +6,21 @@ from catalog.models import Product
 def product_notification_text(product: Product, *, event: str) -> str:
     stock = product.available_stock_count
     if event == "stock":
-        title = "📦 Fresh stock added"
+        title = "📦 Restock alert: fresh stock just landed"
+        intro = "The item you were waiting for is available again. Grab it before it sells out."
     else:
-        title = "🆕 New product available"
+        title = "🔥 New product just dropped"
+        intro = "A new item is live in the shop and ready to buy."
     country = ""
     if product.product_type == Product.ProductType.TELEGRAM_ACCOUNT:
         country = f"\n🌍 Country: {product.country_name or product.country_code or '-'}"
     return (
         f"{title}\n\n"
+        f"{intro}\n\n"
         f"🛍️ {product.name}\n"
         f"💵 Price: {product.price} USDT\n"
         f"📦 Stock: {stock}{country}\n\n"
-        "Open the bot and use /shop or /telegram_accounts to buy."
+        "Open the bot now and use /shop or /telegram_accounts to buy."
     )
 
 

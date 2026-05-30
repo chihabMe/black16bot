@@ -8,8 +8,14 @@ class Broadcast(models.Model):
         SENT = "sent", "Sent"
         FAILED = "failed", "Failed"
 
+    class TargetLanguage(models.TextChoices):
+        ENGLISH = "en", "English"
+        ARABIC = "ar", "Arabic"
+        FRENCH = "fr", "French"
+        SPANISH = "es", "Spanish"
+
     message = models.TextField()
-    target_language = models.CharField(max_length=16, blank=True)
+    target_language = models.CharField(max_length=16, choices=TargetLanguage.choices, blank=True)
     min_balance = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     max_balance = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     joined_after = models.DateTimeField(null=True, blank=True)

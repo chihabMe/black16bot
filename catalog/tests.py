@@ -33,8 +33,16 @@ class ProductNotificationTests(TestCase):
 
         text = product_notification_text(product, event="product")
 
-        self.assertIn("New product", text)
+        self.assertIn("New product just dropped", text)
         self.assertIn("Vietnam", text)
+
+    def test_stock_notification_text_is_restock_message(self):
+        product = Product.objects.create(name="Fresh Product", price=Decimal("1.00"))
+
+        text = product_notification_text(product, event="stock")
+
+        self.assertIn("Restock alert", text)
+        self.assertIn("Fresh Product", text)
 
     @patch("catalog.notifications.send_telegram_message", return_value=True)
     def test_notify_users_about_product_skips_disabled_notifications(self, send_message):
