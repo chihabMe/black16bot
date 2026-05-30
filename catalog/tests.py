@@ -1,9 +1,14 @@
 from decimal import Decimal
 from unittest.mock import patch
 
+from django.contrib.admin.sites import AdminSite
+from django.contrib.auth import get_user_model
+from django.test import RequestFactory
 from django.test import TestCase
 
 from accounts.models import TelegramUser
+from catalog.admin import ProductAdmin
+from catalog.forms import ProductAdminForm
 from catalog.notifications import notify_users_about_product, product_notification_text
 from catalog.models import Product, StockItem
 from catalog.services import bulk_create_stock
@@ -20,6 +25,36 @@ class BulkCreateStockTests(TestCase):
         self.assertEqual(StockItem.objects.filter(product=product).count(), 2)
         secrets = [decrypt_text(item.secret_content) for item in StockItem.objects.filter(product=product)]
         self.assertIn("c:d", secrets)
+
+
+class ProductAdminBulkStockTests(TestCase):
+    def test_product_form_bulk_stock_creates_encrypted_stock_items(self):
+        admin_user = get_user_model().objects.create_superuser("admin", "admin@example.com", "password")
+        request = RequestFactory().post("/")
+        request.user = admin_user
+        form = ProductAdminForm(data={
+            "name": "Bulk Product",
+            "description": "",
+            "note_md": "",
+            "category": "",
+            "product_type": Product.ProductType.DIGITAL,
+            "country_code": "",
+            "country_name": "",
+            "warranty_note": "",
+            "price": "2.50",
+            "sort_order": "0",
+            "stock_lines": "first-secret\n\nsecond-secret",
+        })
+        self.assertTrue(form.is_valid(), form.errors)
+        product = form.save(commit=False)
+        model_admin = ProductAdmin(Product, AdminSite())
+
+        with patch.object(model_admin, "message_user"):
+            model_admin.save_model(request, product, form, change=False)
+
+        self.assertEqual(StockItem.objects.filter(product=product).count(), 2)
+        secrets = [decrypt_text(item.secret_content) for item in StockItem.objects.filter(product=product)]
+        self.assertEqual(secrets, ["first-secret", "second-secret"])
 
 
 class ProductNotificationTests(TestCase):

@@ -6,7 +6,7 @@ from django.urls import path, reverse
 from django.utils.html import format_html
 
 from audit.services import log_admin_action
-from catalog.forms import BulkStockUploadForm
+from catalog.forms import BulkStockUploadForm, ProductAdminForm
 from catalog.models import Product, StockItem
 from catalog.notifications import notify_users_about_product
 from catalog.services import bulk_create_stock
@@ -29,6 +29,7 @@ class StockItemInline(admin.TabularInline):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
+    form = ProductAdminForm
     list_display = (
         "name",
         "product_type",
@@ -47,6 +48,28 @@ class ProductAdmin(admin.ModelAdmin):
     list_editable = ("price", "is_active", "sort_order")
     inlines = (StockItemInline,)
     actions = ("notify_selected_products",)
+    fieldsets = (
+        (None, {
+            "fields": (
+                "name",
+                "description",
+                "note_md",
+                "category",
+                "product_type",
+                "country_code",
+                "country_name",
+                "warranty_note",
+                "allow_infinite_stock",
+                "price",
+                "is_active",
+                "sort_order",
+            )
+        }),
+        ("Bulk stock", {
+            "fields": ("stock_lines", "notify_users_about_stock"),
+            "description": "Paste many stock items here while creating or editing a product. Existing stock is not changed.",
+        }),
+    )
 
     def get_queryset(self, request):
         return super().get_queryset(request).with_stock_counts()
@@ -121,6 +144,30 @@ class ProductAdmin(admin.ModelAdmin):
             "title": f"Bulk upload stock for {product.name}",
         }
         return TemplateResponse(request, "admin/catalog/bulk_stock_upload.html", context)
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        stock_lines = form.cleaned_data.get("stock_lines", "")
+        if not stock_lines.strip():
+            return
+        count = bulk_create_stock(product=obj, raw_lines=stock_lines, added_by=request.user)
+        log_admin_action(
+            action="stock.bulk_upload",
+            actor=request.user,
+            target=obj,
+            message=f"Uploaded {count} stock items from product form",
+            metadata={"count": count},
+        )
+        if form.cleaned_data.get("notify_users_about_stock") and count:
+            sent, failed = notify_users_about_product(product_id=obj.pk, event="stock")
+            log_admin_action(
+                action="notification.stock",
+                actor=request.user,
+                target=obj,
+                message=f"Notified users about stock update: {sent} sent, {failed} failed",
+                metadata={"sent": sent, "failed": failed},
+            )
+        self.message_user(request, f"Added {count} stock items to {obj.name}.")
 
     @admin.action(description="Notify users about selected products")
     def notify_selected_products(self, request, queryset):
