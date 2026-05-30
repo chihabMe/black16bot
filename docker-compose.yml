@@ -102,7 +102,9 @@ services:
   broadcast_worker:
     build: .
     restart: unless-stopped
-    command: python manage.py process_tasks
+    command: >
+      sh -c "python manage.py migrate --noinput
+      && python manage.py process_tasks"
     env_file: .env
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-black16bot}:${POSTGRES_PASSWORD:-black16bot}@db:5432/${POSTGRES_DB:-black16bot}
