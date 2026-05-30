@@ -9,6 +9,8 @@ from django.utils import timezone
 
 from accounts.models import TelegramUser
 from analytics.models import UserActivity
+from broadcasts.models import Broadcast
+from catalog.models import Product, StockItem
 from orders.models import Order
 from payments.models import PaymentRequest
 
@@ -36,7 +38,24 @@ def dashboard_view(request):
             status=PaymentRequest.Status.APPROVED,
             created_at__gte=last_7_days,
         ).count(),
+        "pending_payments": PaymentRequest.objects.filter(status=PaymentRequest.Status.PENDING).count(),
+        "failed_broadcasts": Broadcast.objects.filter(status=Broadcast.Status.FAILED).count(),
+        "available_stock": StockItem.objects.filter(status=StockItem.Status.AVAILABLE).count(),
+        "refunded_orders": Order.objects.filter(status=Order.Status.REFUNDED).count(),
+        "replaced_orders": Order.objects.filter(status=Order.Status.REPLACED).count(),
     }
+
+    stock_counts = list(Product.objects.filter(is_active=True, allow_infinite_stock=False).with_stock_counts())
+    low_stock_products = [product for product in stock_counts if product.available_stock_count <= 5]
+    context["low_stock_products"] = low_stock_products[:10]
+    context["low_stock_count"] = len(low_stock_products)
+    context["out_of_stock_count"] = sum(1 for product in stock_counts if product.available_stock_count == 0)
+    context["pending_payment_requests"] = PaymentRequest.objects.select_related("user").filter(
+        status=PaymentRequest.Status.PENDING,
+    ).order_by("created_at")[:10]
+    context["failed_broadcast_list"] = Broadcast.objects.filter(
+        status=Broadcast.Status.FAILED,
+    ).order_by("-created_at")[:10]
 
     return render(request, "dashboard/index.html", context)
 

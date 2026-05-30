@@ -57,6 +57,34 @@
         position: relative;
         height: 300px;
     }
+    .ops-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    .ops-card {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .ops-card h3 {
+        margin: 0 0 15px 0;
+    }
+    .ops-card table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    .ops-card th,
+    .ops-card td {
+        border-bottom: 1px solid #eee;
+        padding: 8px 4px;
+        text-align: left;
+    }
+    .ops-card .empty {
+        color: #777;
+    }
 </style>
 {% endblock %}
 
@@ -96,6 +124,94 @@
             <div class="subtext">
                 {{ topups_7d }} (7d)
             </div>
+        </div>
+
+        <div class="metric-card">
+            <h3>Pending Payments</h3>
+            <div class="value">{{ pending_payments }}</div>
+            <div class="subtext">Need verification or user proof</div>
+        </div>
+
+        <div class="metric-card">
+            <h3>Stock Health</h3>
+            <div class="value">{{ available_stock }}</div>
+            <div class="subtext">{{ low_stock_count }} low · {{ out_of_stock_count }} out</div>
+        </div>
+
+        <div class="metric-card">
+            <h3>Failed Broadcasts</h3>
+            <div class="value">{{ failed_broadcasts }}</div>
+            <div class="subtext">Review recipients and retry when needed</div>
+        </div>
+
+        <div class="metric-card">
+            <h3>Order Adjustments</h3>
+            <div class="value">{{ refunded_orders }}</div>
+            <div class="subtext">{{ replaced_orders }} replaced</div>
+        </div>
+    </div>
+
+    <div class="ops-grid">
+        <div class="ops-card">
+            <h3>Low Stock Products</h3>
+            {% if low_stock_products %}
+            <table>
+                <thead><tr><th>Product</th><th>Stock</th><th>Price</th></tr></thead>
+                <tbody>
+                    {% for product in low_stock_products %}
+                    <tr>
+                        <td>{{ product.name }}</td>
+                        <td>{{ product.available_stock_count }}</td>
+                        <td>{{ product.price }} USDT</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="empty">No low-stock products.</p>
+            {% endif %}
+        </div>
+
+        <div class="ops-card">
+            <h3>Pending Payments</h3>
+            {% if pending_payment_requests %}
+            <table>
+                <thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Method</th></tr></thead>
+                <tbody>
+                    {% for payment in pending_payment_requests %}
+                    <tr>
+                        <td>#{{ payment.id }}</td>
+                        <td>{{ payment.user }}</td>
+                        <td>{{ payment.amount }} USDT</td>
+                        <td>{{ payment.get_method_display }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="empty">No pending payments.</p>
+            {% endif %}
+        </div>
+
+        <div class="ops-card">
+            <h3>Failed Broadcasts</h3>
+            {% if failed_broadcast_list %}
+            <table>
+                <thead><tr><th>ID</th><th>Sent</th><th>Failed</th><th>Created</th></tr></thead>
+                <tbody>
+                    {% for broadcast in failed_broadcast_list %}
+                    <tr>
+                        <td>#{{ broadcast.id }}</td>
+                        <td>{{ broadcast.sent_count }}</td>
+                        <td>{{ broadcast.failed_count }}</td>
+                        <td>{{ broadcast.created_at }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="empty">No failed broadcasts.</p>
+            {% endif %}
         </div>
     </div>
 

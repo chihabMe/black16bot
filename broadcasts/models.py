@@ -10,6 +10,20 @@ class Broadcast(models.Model):
 
     message = models.TextField()
     target_language = models.CharField(max_length=16, blank=True)
+    min_balance = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    max_balance = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    joined_after = models.DateTimeField(null=True, blank=True)
+    joined_before = models.DateTimeField(null=True, blank=True)
+    active_after = models.DateTimeField(null=True, blank=True)
+    active_before = models.DateTimeField(null=True, blank=True)
+    has_orders = models.BooleanField(null=True, blank=True)
+    product_purchased = models.ForeignKey(
+        "catalog.Product",
+        null=True,
+        blank=True,
+        related_name="targeted_broadcasts",
+        on_delete=models.SET_NULL,
+    )
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT, db_index=True)
     sent_count = models.PositiveIntegerField(default=0)
     failed_count = models.PositiveIntegerField(default=0)

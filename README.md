@@ -86,25 +86,25 @@ For Telegram account marketplace entries, set product type to
 Users can create a payment request with:
 
 ```txt
-/topup_amount 10 binance_deposit
+/topup_amount 10 binance_pay
 ```
 
-After sending the exact payable amount, users submit the transaction ID with:
+After sending the exact payable amount, users submit the Binance Pay order ID or chain transaction ID with:
 
 ```txt
-/topup_proof payment-id transaction-id
+/topup_proof payment-id order-or-transaction-id
 ```
 
 Supported method codes:
 
 ```txt
-binance_deposit
+binance_pay
 usdt_bep20
 usdt_trc20
 ```
 
 Screenshots are not accepted for top-ups. Active methods must be verifiable by
-transaction ID.
+Binance Pay order ID or chain transaction ID.
 
 Payment requests use a unique payable amount. If a user asks to top up
 `10.00 USDT`, the bot may ask them to send `10.01 USDT`. The wallet still
@@ -122,30 +122,16 @@ Admins receive Telegram notifications for new top-up requests when
 
 ## Automatic Top-up Verification
 
-If `BINANCE_API_KEY` and `BINANCE_API_SECRET` are set, Binance top-ups can be
-verified automatically by transaction ID.
-
-For direct instant verification:
-
-```txt
-/binance_topup 10 txid [network]
-```
-
-Example:
-
-```txt
-/binance_topup 10 0xabc123 BSC
-```
+If `BINANCE_API_KEY`, `BINANCE_API_SECRET`, and `BINANCE_PAY_UID` are set,
+Binance Pay top-ups can be verified automatically by order ID.
 
 Rules:
 
-- Only confirmed Binance deposits are credited.
+- Only received Binance Pay transactions are credited.
 - The coin must be `USDT`.
-- The deposit amount must be at least the requested top-up amount.
-- If the confirmed deposit is larger than the requested amount, the full
-  confirmed deposit amount is credited to avoid burning the TXID.
-- If a network is provided, it must match the Binance deposit network.
-- Each TXID can be credited only once.
+- The paid amount must be at least the requested top-up amount.
+- The receiver UID must match `BINANCE_PAY_UID` when configured.
+- Each order ID can be credited only once.
 
 For safest operation, use a read-only Binance API key. Do not enable trading or
 withdrawals for this bot.
@@ -167,17 +153,19 @@ TRONGRID_API_KEY=
 TRON_USDT_CONTRACT_ADDRESS=TXLAQ63Xg1NAzckPwKHvzw7CSEmLMEqcdj
 ```
 
-For pending payment requests where the user submitted a TXID, run this
+Legacy direct Binance deposit verification remains in the code only for old
+pending payments created before Binance Pay became the user-facing method.
+
+For pending payment requests where the user submitted proof, run this
 periodically:
 
 ```bash
 python3 manage.py verify_payments
 ```
 
-This command checks pending Binance, BEP-20, and TRC-20 requests and
-auto-approves only when the transaction is confirmed, sent to the configured
-wallet, uses USDT, has not been used before, and exactly matches the payable
-amount.
+This command checks pending Binance Pay, BEP-20, and TRC-20 requests and
+auto-approves only when the payment is verified, uses USDT, has not been used
+before, and matches the expected amount and receiver.
 
 Expired top-up requests can be cleared by cron or a scheduler with:
 

@@ -37,6 +37,7 @@ class ProductAdmin(admin.ModelAdmin):
         "price",
         "is_active",
         "stock_count",
+        "stock_status",
         "bulk_stock_link",
         "sort_order",
         "updated_at",
@@ -53,6 +54,17 @@ class ProductAdmin(admin.ModelAdmin):
     @admin.display(description="Available stock")
     def stock_count(self, obj):
         return obj.available_stock_count
+
+    @admin.display(description="Stock status")
+    def stock_status(self, obj):
+        if obj.allow_infinite_stock:
+            return format_html('<span style="color: #2e7d32; font-weight: 600;">Infinite</span>')
+        count = obj.available_stock_count
+        if count == 0:
+            return format_html('<span style="color: #b71c1c; font-weight: 600;">Out</span>')
+        if count <= 5:
+            return format_html('<span style="color: #ef6c00; font-weight: 600;">Low</span>')
+        return format_html('<span style="color: #2e7d32; font-weight: 600;">OK</span>')
 
     @admin.display(description="Bulk stock")
     def bulk_stock_link(self, obj):

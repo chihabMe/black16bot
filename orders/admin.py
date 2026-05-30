@@ -7,11 +7,12 @@ from orders.services import OutOfStock, PurchaseError, refund_order, replace_ord
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    list_display = ("id", "user", "product", "price_paid", "status", "created_at", "refunded_at")
+    list_display = ("id", "user", "product", "stock_item", "price_paid", "status", "created_at", "refunded_at", "replaced_at")
     list_filter = ("status", "product", "created_at", "refunded_at")
-    search_fields = ("id", "user__telegram_id", "user__username", "product__name")
+    search_fields = ("id", "user__telegram_id", "user__username", "product__name", "stock_item__id")
     readonly_fields = ("created_at", "refunded_at", "replaced_at")
     autocomplete_fields = ("user", "product", "stock_item")
+    list_select_related = ("user", "product", "stock_item")
     actions = ("refund_selected_orders", "replace_selected_orders")
 
     @admin.action(description="Refund selected orders")

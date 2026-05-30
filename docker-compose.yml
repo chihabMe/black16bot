@@ -1,4 +1,25 @@
 services:
+  traefik:
+    image: traefik:v3.1
+    restart: unless-stopped
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --certificatesresolvers.letsencrypt.acme.email=${TRAEFIK_ACME_EMAIL:?Set TRAEFIK_ACME_EMAIL in .env}
+      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge=true
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik_letsencrypt:/letsencrypt
+
   db:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -24,8 +45,12 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-black16bot}:${POSTGRES_PASSWORD:-black16bot}@db:5432/${POSTGRES_DB:-black16bot}
-    ports:
-      - "8000:8000"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.black16bot.rule=Host(`chihab.online`) || Host(`www.chihab.online`)
+      - traefik.http.routers.black16bot.entrypoints=websecure
+      - traefik.http.routers.black16bot.tls.certresolver=letsencrypt
+      - traefik.http.services.black16bot.loadbalancer.server.port=8000
     depends_on:
       db:
         condition: service_healthy
@@ -74,5 +99,36 @@ services:
       timeout: 10s
       retries: 3
 
+  broadcast_worker:
+    build: .
+    restart: unless-stopped
+    command: python manage.py process_tasks
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-black16bot}:${POSTGRES_PASSWORD:-black16bot}@db:5432/${POSTGRES_DB:-black16bot}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "manage.py", "check"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  dozzle:
+    image: amir20/dozzle:latest
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.dozzle.rule=Host(`logs.chihab.online`)
+      - traefik.http.routers.dozzle.entrypoints=websecure
+      - traefik.http.routers.dozzle.tls.certresolver=letsencrypt
+      - traefik.http.routers.dozzle.middlewares=dozzle-auth
+      - traefik.http.middlewares.dozzle-auth.basicauth.users=${DOZZLE_BASIC_AUTH:?Set DOZZLE_BASIC_AUTH in .env}
+      - traefik.http.services.dozzle.loadbalancer.server.port=8080
+
 volumes:
   postgres_data:
+  traefik_letsencrypt:
