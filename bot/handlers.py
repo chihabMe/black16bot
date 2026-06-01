@@ -20,6 +20,7 @@ from bot.keyboards import (
     pending_payments_menu,
     product_detail_menu,
     product_list_menu,
+    topup_request_menu,
     topup_methods_menu,
 )
 from bot.rate_limit import is_rate_limited
@@ -29,7 +30,7 @@ from orders.services import InsufficientBalance, OutOfStock, ProductUnavailable,
 from payments.models import PaymentRequest
 from payments.binance import BinanceDepositError, verify_binance_deposit
 from payments.chain import ChainDepositError
-from payments.instructions import payment_instruction_text
+from payments.instructions import payment_copy_details_text, payment_instruction_text
 from payments.services import (
     PaymentApprovalError,
     PaymentRequestError,
@@ -328,7 +329,90 @@ async def receive_topup_amount(update, context, method: str, amount_text: str):
 
     context.user_data.pop("pending_topup_method", None)
     context.user_data["pending_topup_proof_payment_id"] = payment.pk
-    await update.message.reply_text(payment_instruction_text(payment), parse_mode="HTML", reply_markup=back_menu("home"))
+    await update.message.reply_text(
+        payment_instruction_text(payment),
+        parse_mode="HTML",
+        reply_markup=topup_request_menu(payment.pk),
+    )
+
+
+def get_user_payment(*, payment_id: int, user_id: int) -> PaymentRequest:
+    return PaymentRequest.objects.select_related("user").get(pk=payment_id, user_id=user_id)
+
+
+async def topup_submit_id(update, context, payment_id: int):
+    user = await sync_to_async(get_user)(update)
+    try:
+        payment = await sync_to_async(get_user_payment)(payment_id=payment_id, user_id=user.pk)
+    except PaymentRequest.DoesNotExist:
+        await send_or_edit(update, "Payment request not found.", back_menu("payments"))
+        return
+    if payment.status != PaymentRequest.Status.PENDING:
+        await send_or_edit(update, f"Payment request #{payment.pk} is already {payment.status}.", back_menu("payments"))
+        return
+
+    context.user_data["pending_topup_proof_payment_id"] = payment.pk
+    label = "Binance Pay Order ID" if payment.method == PaymentRequest.Method.BINANCE_PAY else "transaction ID"
+    await send_or_edit(
+        update,
+        f"✅ Send your {label} now.\n\n"
+        f"Payment request: #{payment.pk}\n"
+        "Just reply with the ID in this chat. No command needed.",
+        topup_request_menu(payment.pk),
+    )
+
+
+async def topup_copy_details(update, context, payment_id: int):
+    user = await sync_to_async(get_user)(update)
+    try:
+        payment = await sync_to_async(get_user_payment)(payment_id=payment_id, user_id=user.pk)
+    except PaymentRequest.DoesNotExist:
+        await send_or_edit(update, "Payment request not found.", back_menu("payments"))
+        return
+    await send_or_edit(
+        update,
+        payment_copy_details_text(payment),
+        topup_request_menu(payment.pk),
+        parse_mode="HTML",
+    )
+
+
+async def topup_check_payment(update, context, payment_id: int):
+    user = await sync_to_async(get_user)(update)
+    try:
+        payment = await sync_to_async(get_user_payment)(payment_id=payment_id, user_id=user.pk)
+    except PaymentRequest.DoesNotExist:
+        await send_or_edit(update, "Payment request not found.", back_menu("payments"))
+        return
+
+    def verify():
+        fresh_payment = PaymentRequest.objects.select_related("user").get(pk=payment.pk)
+        return verify_pending_payment(fresh_payment)
+
+    try:
+        verified = await sync_to_async(verify)()
+    except (BinanceDepositError, ChainDepositError) as exc:
+        await send_or_edit(
+            update,
+            f"Payment request #{payment.pk} is not verified yet.\n\n{exc}\n\n"
+            "If you already paid, tap ✅ I Paid / Submit ID and send the correct ID.",
+            topup_request_menu(payment.pk),
+        )
+        return
+
+    if verified:
+        payment = await sync_to_async(PaymentRequest.objects.get)(pk=payment.pk)
+        await send_or_edit(
+            update,
+            f"✅ Payment request #{payment.pk} verified.\nAmount credited: {payment.amount} USDT",
+            back_menu("home"),
+        )
+        return
+    await send_or_edit(update, "This payment method cannot be checked automatically yet.", topup_request_menu(payment.pk))
+
+
+async def topup_cancel_request(update, context, payment_id: int):
+    await cancel_payment(update, context, payment_id)
 
 
 async def topup_amount(update, context):
@@ -501,6 +585,7 @@ async def create_topup_from_parts(update, amount_text: str, method: str, proof: 
     await update.message.reply_text(
         payment_instruction_text(payment),
         parse_mode="HTML",
+        reply_markup=topup_request_menu(payment.pk),
     )
 
 
@@ -749,6 +834,14 @@ async def callback_router(update, context):
             await cancel_payment(update, context, int(data.split(":", 1)[1]))
         elif data.startswith("topup_method:"):
             await create_topup_request(update, context, data.split(":", 1)[1])
+        elif data.startswith("topup_submit:"):
+            await topup_submit_id(update, context, int(data.split(":", 1)[1]))
+        elif data.startswith("topup_copy:"):
+            await topup_copy_details(update, context, int(data.split(":", 1)[1]))
+        elif data.startswith("topup_check:"):
+            await topup_check_payment(update, context, int(data.split(":", 1)[1]))
+        elif data.startswith("topup_cancel:"):
+            await topup_cancel_request(update, context, int(data.split(":", 1)[1]))
         elif data == "notifications":
             await show_notifications(update, context)
         elif data == "notifications_toggle":
@@ -769,11 +862,11 @@ async def callback_router(update, context):
         await query.answer("Invalid request. Please try again.", show_alert=True)
 
 
-async def send_or_edit(update, text: str, reply_markup=None):
+async def send_or_edit(update, text: str, reply_markup=None, parse_mode=None):
     if update.callback_query:
-        await update.callback_query.edit_message_text(text, reply_markup=reply_markup)
+        await update.callback_query.edit_message_text(text, reply_markup=reply_markup, parse_mode=parse_mode)
     else:
-        await update.message.reply_text(text, reply_markup=reply_markup)
+        await update.message.reply_text(text, reply_markup=reply_markup, parse_mode=parse_mode)
 
 
 async def limited(update, action: str, *, limit: int = 12) -> bool:

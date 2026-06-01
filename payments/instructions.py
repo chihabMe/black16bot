@@ -58,3 +58,25 @@ def payment_instruction_text(payment: PaymentRequest) -> str:
         f"After the transaction is confirmed, reply here with the transaction ID or use:\n"
         f"/topup_proof {payment.pk} transaction-id"
     )
+
+
+def payment_copy_details_text(payment: PaymentRequest) -> str:
+    destination = payment_destination(payment.method)
+    amount = payment.payable_amount or payment.amount
+    proof_label = "Binance Pay Order ID" if payment.method == PaymentRequest.Method.BINANCE_PAY else "Transaction ID"
+    destination_label = "Destination"
+    if payment.method == PaymentRequest.Method.BINANCE_PAY:
+        destination_label = "Binance Pay ID"
+    elif payment.method == PaymentRequest.Method.USDT_BEP20:
+        destination_label = "BEP-20 wallet"
+    elif payment.method == PaymentRequest.Method.USDT_TRC20:
+        destination_label = "TRC-20 wallet"
+
+    destination_line = escape(destination) if destination else "Ask support/admin for destination"
+    return (
+        f"📋 Copy payment details\n\n"
+        f"Payment ID:\n<code>{payment.pk}</code>\n\n"
+        f"Send exactly:\n<code>{amount}</code> USDT\n\n"
+        f"{destination_label}:\n<code>{destination_line}</code>\n\n"
+        f"After paying, tap ✅ I Paid / Submit ID and send your {proof_label}."
+    )

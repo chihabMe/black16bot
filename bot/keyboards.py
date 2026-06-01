@@ -103,6 +103,25 @@ def topup_methods_menu():
     return InlineKeyboardMarkup(rows)
 
 
+def topup_request_menu(payment_id: int):
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+    return InlineKeyboardMarkup(
+        [
+            [InlineKeyboardButton("✅ I Paid / Submit ID", callback_data=f"topup_submit:{payment_id}")],
+            [
+                InlineKeyboardButton("📋 Show Copy Details", callback_data=f"topup_copy:{payment_id}"),
+                InlineKeyboardButton("🔄 Check Payment", callback_data=f"topup_check:{payment_id}"),
+            ],
+            [
+                InlineKeyboardButton("❌ Cancel Request", callback_data=f"topup_cancel:{payment_id}"),
+                InlineKeyboardButton("🛟 Support", callback_data="support"),
+            ],
+            [InlineKeyboardButton("⬅️ Back", callback_data="home")],
+        ]
+    )
+
+
 def notifications_menu(enabled: bool):
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 

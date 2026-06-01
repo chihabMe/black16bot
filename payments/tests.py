@@ -8,6 +8,7 @@ from payments.binance import BinanceDepositError, verify_binance_deposit, verify
 from payments.chain import verify_pending_bep20_payment, verify_pending_trc20_payment
 from payments.models import PaymentRequest
 from payments.models import VerifiedDeposit
+from payments.instructions import payment_copy_details_text
 from payments.services import (
     PaymentRequestError,
     approve_payment_request,
@@ -150,6 +151,21 @@ class PaymentRequestServiceTests(TransactionTestCase):
         payment.refresh_from_db()
         self.assertEqual(payment.proof_text, "0xabc123")
         self.assertEqual(payment.status, PaymentRequest.Status.PENDING)
+
+    @override_settings(BINANCE_PAY_ID="743232345")
+    def test_payment_copy_details_text_includes_copyable_fields(self):
+        payment = PaymentRequest.objects.create(
+            user=self.user,
+            amount=Decimal("10.00"),
+            payable_amount=Decimal("10.01"),
+            method=PaymentRequest.Method.BINANCE_PAY,
+        )
+
+        text = payment_copy_details_text(payment)
+
+        self.assertIn("<code>10.01</code>", text)
+        self.assertIn("<code>743232345</code>", text)
+        self.assertIn(f"<code>{payment.pk}</code>", text)
 
     def test_submit_payment_proof_rejects_non_pending_request(self):
         payment = PaymentRequest.objects.create(

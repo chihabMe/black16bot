@@ -1,7 +1,7 @@
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
-from bot.keyboards import main_menu, topup_methods_menu
+from bot.keyboards import main_menu, topup_methods_menu, topup_request_menu
 from bot.models import BotRateLimit
 from bot.rate_limit import is_rate_limited
 
@@ -53,3 +53,17 @@ class TopupMenuTests(TestCase):
         callbacks = [button.callback_data for row in markup.inline_keyboard for button in row]
         self.assertIn("topup_method:binance_pay", callbacks)
         self.assertNotIn("topup_method:binance_deposit", callbacks)
+
+    def test_topup_request_menu_has_helpful_actions(self):
+        markup = topup_request_menu(42)
+        labels = [button.text for row in markup.inline_keyboard for button in row]
+        callbacks = [button.callback_data for row in markup.inline_keyboard for button in row]
+
+        self.assertIn("✅ I Paid / Submit ID", labels)
+        self.assertIn("📋 Show Copy Details", labels)
+        self.assertIn("🔄 Check Payment", labels)
+        self.assertIn("❌ Cancel Request", labels)
+        self.assertIn("topup_submit:42", callbacks)
+        self.assertIn("topup_copy:42", callbacks)
+        self.assertIn("topup_check:42", callbacks)
+        self.assertIn("topup_cancel:42", callbacks)
