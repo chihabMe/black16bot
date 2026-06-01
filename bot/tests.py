@@ -55,12 +55,12 @@ class TopupMenuTests(TestCase):
         self.assertNotIn("topup_method:binance_deposit", callbacks)
 
     def test_topup_request_menu_has_helpful_actions(self):
-        markup = topup_request_menu(42)
+        markup = topup_request_menu(42, "binance_pay")
         labels = [button.text for row in markup.inline_keyboard for button in row]
         callbacks = [button.callback_data for row in markup.inline_keyboard for button in row]
 
         self.assertIn("✅ I Paid / Submit ID", labels)
-        self.assertIn("📋 Show Copy Details", labels)
+        self.assertIn("📋 Copy Binance ID", labels)
         self.assertIn("🔄 Check Payment", labels)
         self.assertIn("❌ Cancel Request", labels)
         self.assertIn("topup_submit:42", callbacks)

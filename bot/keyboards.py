@@ -103,14 +103,17 @@ def topup_methods_menu():
     return InlineKeyboardMarkup(rows)
 
 
-def topup_request_menu(payment_id: int):
+def topup_request_menu(payment_id: int, method: str = ""):
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    from payments.models import PaymentRequest
+
+    copy_label = "📋 Copy Binance ID" if method == PaymentRequest.Method.BINANCE_PAY else "📋 Copy Address"
 
     return InlineKeyboardMarkup(
         [
             [InlineKeyboardButton("✅ I Paid / Submit ID", callback_data=f"topup_submit:{payment_id}")],
             [
-                InlineKeyboardButton("📋 Show Copy Details", callback_data=f"topup_copy:{payment_id}"),
+                InlineKeyboardButton(copy_label, callback_data=f"topup_copy:{payment_id}"),
                 InlineKeyboardButton("🔄 Check Payment", callback_data=f"topup_check:{payment_id}"),
             ],
             [

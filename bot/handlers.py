@@ -332,7 +332,7 @@ async def receive_topup_amount(update, context, method: str, amount_text: str):
     await update.message.reply_text(
         payment_instruction_text(payment),
         parse_mode="HTML",
-        reply_markup=topup_request_menu(payment.pk),
+        reply_markup=topup_request_menu(payment.pk, payment.method),
     )
 
 
@@ -358,7 +358,7 @@ async def topup_submit_id(update, context, payment_id: int):
         f"✅ Send your {label} now.\n\n"
         f"Payment request: #{payment.pk}\n"
         "Just reply with the ID in this chat. No command needed.",
-        topup_request_menu(payment.pk),
+        topup_request_menu(payment.pk, payment.method),
     )
 
 
@@ -372,7 +372,7 @@ async def topup_copy_details(update, context, payment_id: int):
     await send_or_edit(
         update,
         payment_copy_details_text(payment),
-        topup_request_menu(payment.pk),
+        topup_request_menu(payment.pk, payment.method),
         parse_mode="HTML",
     )
 
@@ -396,7 +396,7 @@ async def topup_check_payment(update, context, payment_id: int):
             update,
             f"Payment request #{payment.pk} is not verified yet.\n\n{exc}\n\n"
             "If you already paid, tap ✅ I Paid / Submit ID and send the correct ID.",
-            topup_request_menu(payment.pk),
+            topup_request_menu(payment.pk, payment.method),
         )
         return
 
@@ -408,7 +408,7 @@ async def topup_check_payment(update, context, payment_id: int):
             back_menu("home"),
         )
         return
-    await send_or_edit(update, "This payment method cannot be checked automatically yet.", topup_request_menu(payment.pk))
+    await send_or_edit(update, "This payment method cannot be checked automatically yet.", topup_request_menu(payment.pk, payment.method))
 
 
 async def topup_cancel_request(update, context, payment_id: int):
@@ -585,7 +585,7 @@ async def create_topup_from_parts(update, amount_text: str, method: str, proof: 
     await update.message.reply_text(
         payment_instruction_text(payment),
         parse_mode="HTML",
-        reply_markup=topup_request_menu(payment.pk),
+        reply_markup=topup_request_menu(payment.pk, payment.method),
     )
 
 
@@ -864,7 +864,15 @@ async def callback_router(update, context):
 
 async def send_or_edit(update, text: str, reply_markup=None, parse_mode=None):
     if update.callback_query:
-        await update.callback_query.edit_message_text(text, reply_markup=reply_markup, parse_mode=parse_mode)
+        from telegram.error import BadRequest
+
+        try:
+            await update.callback_query.edit_message_text(text, reply_markup=reply_markup, parse_mode=parse_mode)
+        except BadRequest as exc:
+            if "Message is not modified" in str(exc):
+                await update.callback_query.answer("Already showing this.", show_alert=False)
+                return
+            raise
     else:
         await update.message.reply_text(text, reply_markup=reply_markup, parse_mode=parse_mode)
 
